@@ -1,0 +1,45 @@
+# Dependências
+node_modules/
+.npm/
+
+# Variáveis de ambiente (NUNCA versionar — use os .env.example)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Build / artefatos
+dist/
+build/
+*.tsbuildinfo
+
+# Prisma — client gerado
+apps/api/src/generated/
+
+# Expo / React Native
+.expo/
+.expo-shared/
+apps/mobile/android/
+apps/mobile/ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Testes
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Editores / SO
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

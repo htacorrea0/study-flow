@@ -1,0 +1,38 @@
+# PostgreSQL de desenvolvimento do Study Flow.
+#
+#   npm run db:up     sobe o banco e espera ficar saudável
+#   npm run db:down   para o banco preservando os dados
+#   npm run db:reset  apaga o volume e recria o banco do zero
+#
+# Só o banco roda em container: a API e o Expo rodam na máquina porque o
+# celular físico precisa alcançar a API pelo IP da rede local.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: studyflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-studyflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-studyflow_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-studyflow}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # A imagem 18+ espera o mount em /var/lib/postgresql (e não mais em
+      # /var/lib/postgresql/data), para permitir `pg_upgrade --link` depois.
+      - studyflow-pgdata:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-studyflow} -d ${POSTGRES_DB:-studyflow}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  studyflow-pgdata:
+    name: studyflow-pgdata

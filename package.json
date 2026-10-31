@@ -1,0 +1,36 @@
+{
+  "name": "study-flow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Study Flow — aplicativo mobile de organização acadêmica e planejamento inteligente de estudos",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "setup": "npm install && npm run db:up && npm run db:deploy",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:reset": "docker compose down -v && npm run db:up && npm run db:deploy",
+    "db:generate": "npm run -w @study-flow/api prisma:generate",
+    "db:migrate": "npm run -w @study-flow/api prisma:migrate --",
+    "db:deploy": "npm run -w @study-flow/api prisma:deploy",
+    "db:status": "npm run -w @study-flow/api prisma:status",
+    "db:studio": "npm run -w @study-flow/api prisma:studio",
+    "dev:api": "npm run db:up && npm run db:deploy && npm run -w @study-flow/api dev",
+    "dev:mobile": "npm run -w @study-flow/mobile start",
+    "typecheck": "npm run -w @study-flow/shared typecheck && npm run -w @study-flow/api typecheck && npm run -w @study-flow/mobile typecheck",
+    "test": "npm run -w @study-flow/api test",
+    "test:watch": "npm run -w @study-flow/api test:watch"
+  },
+  "devDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "~6.0.3"
+  }
+}
