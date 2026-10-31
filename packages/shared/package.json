@@ -1,0 +1,18 @@
+{
+  "name": "@study-flow/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tipos, enums e schemas de validação compartilhados entre a API e o app mobile",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}
