@@ -26,6 +26,7 @@
     "dev:mobile": "npm run -w @study-flow/mobile start",
     "typecheck": "npm run -w @study-flow/shared typecheck && npm run -w @study-flow/api typecheck && npm run -w @study-flow/mobile typecheck",
     "test": "npm run -w @study-flow/api test",
+    "test:int": "npm run db:up && npm run -w @study-flow/api test:int",
     "test:watch": "npm run -w @study-flow/api test:watch"
   },
   "devDependencies": {

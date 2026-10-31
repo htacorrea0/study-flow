@@ -2,7 +2,7 @@ import type { RequestHandler } from 'express';
 import type { ApiFieldIssue } from '@study-flow/shared';
 import type { ZodType } from 'zod';
 
-import { ValidationError } from '../errors/httpErrors';
+import { ValidationError } from '../errors/HttpErrors';
 
 /** Schemas opcionais por parte da requisição. */
 export interface RequestSchemas {

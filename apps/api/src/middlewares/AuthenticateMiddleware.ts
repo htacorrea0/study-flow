@@ -1,22 +1,18 @@
 import type { RequestHandler } from 'express';
 
-import { UnauthorizedError } from '../errors/httpErrors';
+import { ForbiddenError, UnauthorizedError } from '../errors/HttpErrors';
+import { verifyAccessToken } from '../security/token';
 
 /**
  * Middleware de autenticação por Bearer token.
  *
- * ESTADO ATUAL (Etapa 1): a extração do cabeçalho está pronta, mas a
- * verificação do JWT ainda NÃO está implementada — é a Etapa 2. O middleware
- * existe agora para que as rotas futuras já sejam escritas com ele e para
- * manter a autenticação fora dos controllers de cada funcionalidade.
+ * Confere a assinatura e a validade do token e preenche `req.user`. Toda rota
+ * que mexe em dado de alguém passa por aqui — é o que mantém a autenticação
+ * fora dos controllers de cada funcionalidade.
  *
- * O que entra aqui na Etapa 2:
- *   1. verificar a assinatura e a expiração do token com `env.JWT_SECRET`;
- *   2. popular `req.user` com o `id` e o `email` extraídos do payload;
- *   3. chamar `next()`.
- *
- * O que NÃO entra aqui: consulta ao banco por requisição (o payload do token
- * já carrega a identidade) nem regra de negócio de qualquer funcionalidade.
+ * NÃO consulta o banco a cada requisição: o payload do token já carrega a
+ * identidade. Quem precisa dos dados completos do usuário busca na camada de
+ * serviço, como faz o `GET /auth/me`.
  */
 export const authenticate: RequestHandler = (req, _res, next) => {
   const header = req.headers.authorization;
@@ -33,12 +29,19 @@ export const authenticate: RequestHandler = (req, _res, next) => {
     return;
   }
 
-  // TODO (Etapa 2): verificar o token e preencher req.user.
-  next(
-    new UnauthorizedError(
-      'Autenticação ainda não implementada nesta etapa do projeto.',
-    ),
-  );
+  const payload = verifyAccessToken(token);
+
+  if (payload === null) {
+    // Token expirado, adulterado ou assinado com outro segredo levam todos a
+    // esta mesma resposta: detalhar o motivo só ajudaria quem está testando
+    // tokens. O app trata qualquer 401 como "entre de novo".
+    next(new UnauthorizedError('Sessão expirada ou inválida. Entre novamente.'));
+    return;
+  }
+
+  req.user = { id: payload.sub, email: payload.email };
+
+  next();
 };
 
 /**
@@ -58,6 +61,6 @@ export function assertOwnership(
   if (resourceUserId !== requestUserId) {
     // 404 em vez de 403 seria uma alternativa válida (não revela a existência
     // do recurso). Aqui o 403 é suficiente porque os ids são UUIDs aleatórios.
-    throw new UnauthorizedError('Você não tem acesso a este recurso.');
+    throw new ForbiddenError();
   }
 }

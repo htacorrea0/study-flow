@@ -2,8 +2,8 @@ import cors from 'cors';
 import express, { type Express } from 'express';
 
 import { env } from './config/env';
-import { errorHandler } from './middlewares/errorHandler';
-import { notFoundHandler } from './middlewares/notFoundHandler';
+import { errorHandler } from './middlewares/ErrorHandlerMiddleware';
+import { notFoundHandler } from './middlewares/NotFoundHandlerMiddleware';
 import { routes } from './routes';
 
 /**

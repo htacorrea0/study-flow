@@ -15,7 +15,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:status": "prisma migrate status",
     "prisma:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:int": "node scripts/setup-test-db.mjs && vitest run --config vitest.integration.config.mts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
@@ -33,7 +34,9 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
+    "@types/pg": "^8.15.6",
     "@types/supertest": "^7.2.1",
+    "pg": "^8.16.3",
     "prisma": "^7.10.1",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",

@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 
-import { NotFoundError } from '../errors/httpErrors';
+import { NotFoundError } from '../errors/HttpErrors';
 
 /**
  * Captura qualquer rota não registrada e converte em NotFoundError, para que

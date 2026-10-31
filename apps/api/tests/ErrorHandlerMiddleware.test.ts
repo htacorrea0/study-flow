@@ -8,9 +8,9 @@ import {
   NotFoundError,
   UnauthorizedError,
   ValidationError,
-} from '../src/errors/httpErrors';
-import { errorHandler } from '../src/middlewares/errorHandler';
-import { validateRequest } from '../src/middlewares/validateRequest';
+} from '../src/errors/HttpErrors';
+import { errorHandler } from '../src/middlewares/ErrorHandlerMiddleware';
+import { validateRequest } from '../src/middlewares/ValidateRequestMiddleware';
 
 /** Monta um app mínimo com uma rota que lança o erro recebido. */
 function appThatThrows(error: unknown) {

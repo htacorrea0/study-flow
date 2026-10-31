@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
-import { healthRoutes } from './health.routes';
+import { authRoutes } from './AuthRoutes';
+import { healthRoutes } from './HealthRoutes';
 
 /**
  * Router raiz da API.
@@ -10,7 +11,6 @@ import { healthRoutes } from './health.routes';
  * diretamente neste arquivo, e nenhum handler é escrito aqui.
  *
  * Previsto para as próximas etapas:
- *   /auth           cadastro, login e logout
  *   /subjects       matérias
  *   /assessments    provas e trabalhos (com os conteúdos aninhados)
  *   /availability   disponibilidade habitual e exceções
@@ -21,3 +21,4 @@ import { healthRoutes } from './health.routes';
 export const routes = Router();
 
 routes.use('/health', healthRoutes);
+routes.use('/auth', authRoutes);

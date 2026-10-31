@@ -7,7 +7,7 @@ import { AppError } from './AppError';
  *
  * Os serviços lançam estas classes; nenhum controller precisa montar resposta
  * de erro à mão, e o formato do corpo fica garantido num lugar só
- * (src/middlewares/errorHandler.ts).
+ * (src/middlewares/ErrorHandlerMiddleware.ts).
  */
 
 /** 400 — a requisição em si está malformada. */
@@ -56,5 +56,16 @@ export class NotFoundError extends AppError {
 export class ConflictError extends AppError {
   constructor(message = 'Este registro já existe.') {
     super(message, 409, 'CONFLICT');
+  }
+}
+
+/**
+ * 429 — tentativas demais em pouco tempo.
+ *
+ * Usado pelo limitador das rotas de autenticação (src/middlewares/RateLimitMiddleware.ts).
+ */
+export class TooManyRequestsError extends AppError {
+  constructor(message = 'Muitas tentativas. Tente de novo mais tarde.') {
+    super(message, 429, 'TOO_MANY_REQUESTS');
   }
 }
