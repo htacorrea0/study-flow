@@ -11,4 +11,6 @@ Regras:
 - Contexto não faz regra de negócio; ele guarda estado e delega as chamadas
   para `src/services`.
 
-Vazio nesta etapa: a autenticação funcional não faz parte deste escopo.
+Nesta etapa: `SessionContext.tsx` guarda a sessão (token no armazenamento
+seguro, usuário autenticado, entrar, cadastrar e sair) e delega as chamadas
+para `src/services/auth/AuthService.ts`.

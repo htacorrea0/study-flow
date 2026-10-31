@@ -10,4 +10,5 @@ Regras:
 - Regra de negócio de verdade (distribuição do plano de estudos) vive no
   backend, não aqui.
 
-Vazio nesta etapa.
+Nesta etapa: `formErrors.ts` (traduz uma falha da API em erros de campo) e
+`timezone.ts` (fuso do aparelho, enviado no cadastro).
