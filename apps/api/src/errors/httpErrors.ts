@@ -1,0 +1,60 @@
+import type { ApiFieldIssue } from '@study-flow/shared';
+
+import { AppError } from './AppError';
+
+/**
+ * Erros prontos para os casos mais comuns da API.
+ *
+ * Os serviços lançam estas classes; nenhum controller precisa montar resposta
+ * de erro à mão, e o formato do corpo fica garantido num lugar só
+ * (src/middlewares/errorHandler.ts).
+ */
+
+/** 400 — a requisição em si está malformada. */
+export class BadRequestError extends AppError {
+  constructor(message = 'Requisição inválida.') {
+    super(message, 400, 'BAD_REQUEST');
+  }
+}
+
+/** 422 — a requisição está bem formada, mas os dados não passaram na validação. */
+export class ValidationError extends AppError {
+  constructor(
+    issues: readonly ApiFieldIssue[],
+    message = 'Alguns campos estão inválidos.',
+  ) {
+    super(message, 422, 'VALIDATION_ERROR', issues);
+  }
+}
+
+/** 401 — falta autenticação ou o token é inválido. */
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Autenticação necessária.') {
+    super(message, 401, 'UNAUTHORIZED');
+  }
+}
+
+/**
+ * 403 — autenticado, mas o recurso pertence a outra pessoa.
+ *
+ * É o erro a usar sempre que um registro existe mas tem outro userId.
+ */
+export class ForbiddenError extends AppError {
+  constructor(message = 'Você não tem acesso a este recurso.') {
+    super(message, 403, 'FORBIDDEN');
+  }
+}
+
+/** 404 — o recurso não existe. */
+export class NotFoundError extends AppError {
+  constructor(message = 'Recurso não encontrado.') {
+    super(message, 404, 'NOT_FOUND');
+  }
+}
+
+/** 409 — conflito com o estado atual (ex.: e-mail ou matéria já cadastrados). */
+export class ConflictError extends AppError {
+  constructor(message = 'Este registro já existe.') {
+    super(message, 409, 'CONFLICT');
+  }
+}

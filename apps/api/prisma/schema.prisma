@@ -1,0 +1,352 @@
+// ---------------------------------------------------------------------------
+// Study Flow — modelo de dados
+//
+// As decisões de modelagem e os trade-offs estão explicados em
+// docs/decisoes-arquiteturais.md. Os pontos que mais influenciam o resto do
+// sistema estão comentados aqui, junto do modelo a que se referem.
+//
+// Ao alterar um enum deste arquivo, atualize também o espelho em
+// packages/shared/src/types/domain.ts — o app mobile não importa o Prisma.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "cjs"
+}
+
+// A partir do Prisma 7 a URL de conexao nao mora mais aqui:
+// - as migrations leem de `prisma.config.ts`;
+// - o PrismaClient recebe um driver adapter em `src/config/prisma.ts`.
+datasource db {
+  provider = "postgresql"
+}
+
+// --------------------------------- Enums -----------------------------------
+
+enum AssessmentType {
+  EXAM // prova
+  ASSIGNMENT // trabalho
+}
+
+/// PLANNED e SKIPPED são estados distintos de propósito: uma atividade futura
+/// que ainda não chegou não pode ser confundida com uma que a pessoa declarou
+/// que não fez. Sem essa distinção o app trataria todo o planejamento futuro
+/// como perdido, e o recálculo tomaria decisões erradas.
+enum ActivityStatus {
+  PLANNED
+  IN_PROGRESS
+  DONE
+  SKIPPED
+}
+
+enum StudyPlanStatus {
+  ACTIVE
+  SUPERSEDED
+}
+
+enum ResourceType {
+  VIDEO
+  ARTICLE
+  COURSE
+  EXERCISE_LIST
+  OTHER
+}
+
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+// -------------------------------- Modelos ----------------------------------
+
+/// Pessoa usuária do aplicativo.
+///
+/// É a raiz de isolamento: todo agregado do domínio carrega userId, e toda
+/// consulta das próximas etapas precisa filtrar por ele.
+model User {
+  id           String @id @default(uuid()) @db.Uuid
+  email        String @unique
+  name         String
+  /// Somente o hash Argon2id. A senha em texto puro nunca é persistida nem logada.
+  passwordHash String
+
+  /// Fuso usado para decidir a que dia civil pertence uma atividade.
+  timezone String @default("America/Sao_Paulo")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subjects               Subject[]
+  assessments            Assessment[]
+  availabilities         StudyAvailability[]
+  availabilityExceptions AvailabilityException[]
+  studyPlans             StudyPlan[]
+  progressRecords        StudyProgress[]
+  notificationPreference NotificationPreference?
+
+  @@map("users")
+}
+
+/// Matéria acadêmica cadastrada pela pessoa usuária (ex.: Eletrônica Analógica).
+model Subject {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  name   String
+  /// Cor hexadecimal opcional, para distinguir as matérias no calendário.
+  color  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessments Assessment[]
+
+  @@unique([userId, name])
+  @@map("subjects")
+}
+
+/// Prova ou trabalho, com as informações que alimentam o planejamento.
+///
+/// Vários registros podem cair na mesma data, inclusive de matérias
+/// diferentes: nada no modelo impede isso, e o algoritmo precisa considerar
+/// todas as avaliações do horizonte ao mesmo tempo.
+model Assessment {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  subjectId  String         @db.Uuid
+  type       AssessmentType
+  title      String
+  /// Momento da prova ou prazo de entrega do trabalho.
+  dueAt      DateTime
+  /// false quando a pessoa informou só a data; nesse caso o horário de dueAt
+  /// é irrelevante e a interface deve exibir apenas o dia.
+  hasTime    Boolean        @default(false)
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Restrict de propósito: apagar uma matéria que ainda tem avaliações falha
+  /// no banco, obrigando a camada de serviço a tratar o caso explicitamente em
+  /// vez de destruir dados em silêncio.
+  subject  Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  contents StudyContent[]
+
+  @@index([userId, dueAt])
+  @@index([subjectId])
+  @@map("assessments")
+}
+
+/// Assunto que precisa ser estudado para uma avaliação.
+///
+/// É a unidade de planejamento: o algoritmo distribui conteúdos pelos dias
+/// disponíveis, e o progresso é registrado contra o conteúdo (ver StudyProgress).
+model StudyContent {
+  id           String  @id @default(uuid()) @db.Uuid
+  assessmentId String  @db.Uuid
+  title        String
+  description  String?
+
+  /// Esforço estimado em minutos. Nulo significa "ainda não estimado": o
+  /// algoritmo aplica um padrão e sinaliza a estimativa como inferida.
+  estimatedEffortMinutes Int?
+
+  /// Peso relativo dentro da avaliação. Quanto maior, mais cedo o algoritmo
+  /// aloca o conteúdo quando o tempo disponível não cobre tudo.
+  priority Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assessment      Assessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  resources       StudyResource[]
+  activities      StudyActivity[]
+  progressRecords StudyProgress[]
+
+  @@index([assessmentId])
+  @@map("study_contents")
+}
+
+/// Disponibilidade habitual de estudo, um registro por dia da semana.
+///
+/// A ausência de registro para um dia significa que a pessoa não estuda nele.
+/// minutes = 0 tem o mesmo efeito prático e é aceito para facilitar a edição
+/// na interface sem precisar apagar a linha.
+model StudyAvailability {
+  id      String  @id @default(uuid()) @db.Uuid
+  userId  String  @db.Uuid
+  weekday Weekday
+  minutes Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekday])
+  @@map("study_availabilities")
+}
+
+/// Disponibilidade excepcional numa data específica, que SUBSTITUI a habitual
+/// naquele dia (ex.: num sábado em que normalmente não estuda, há 3 horas livres).
+model AvailabilityException {
+  id      String   @id @default(uuid()) @db.Uuid
+  userId  String   @db.Uuid
+  date    DateTime @db.Date
+  minutes Int
+  reason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("availability_exceptions")
+}
+
+/// Uma execução do algoritmo de planejamento.
+///
+/// Recalcular NÃO sobrescreve o plano anterior: cria um StudyPlan novo e marca
+/// o antigo como SUPERSEDED. Assim o histórico de alterações de datas fica
+/// preservado e dá para comparar versões. Deve existir no máximo um plano
+/// ACTIVE por pessoa — regra garantida na camada de serviço, dentro da mesma
+/// transação que cria a nova versão.
+model StudyPlan {
+  id     String          @id @default(uuid()) @db.Uuid
+  userId String          @db.Uuid
+  status StudyPlanStatus @default(ACTIVE)
+
+  /// Identifica a versão do algoritmo que gerou este plano, para que planos
+  /// antigos continuem interpretáveis depois de mudanças na heurística.
+  algorithmVersion String
+
+  /// Janela coberta por este plano.
+  horizonStart DateTime @db.Date
+  horizonEnd   DateTime @db.Date
+
+  generatedAt DateTime @default(now())
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities StudyActivity[]
+
+  @@index([userId, status])
+  @@map("study_plans")
+}
+
+/// Atividade concreta alocada num dia (ex.: "Resolver lista de exercícios
+/// sobre Thévenin"), e não apenas o nome do assunto.
+///
+/// Pertence a uma versão do plano: ao recalcular, as atividades da versão
+/// anterior permanecem como histórico junto do plano SUPERSEDED.
+model StudyActivity {
+  id        String @id @default(uuid()) @db.Uuid
+  planId    String @db.Uuid
+  contentId String @db.Uuid
+
+  title            String
+  scheduledDate    DateTime       @db.Date
+  estimatedMinutes Int
+  /// Ordem da atividade dentro do dia.
+  position         Int
+  status           ActivityStatus @default(PLANNED)
+
+  /// true quando a pessoa editou a atividade à mão. O recálculo deve respeitar
+  /// essas edições em vez de descartá-las silenciosamente.
+  manuallyEdited Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plan            StudyPlan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  /// A avaliação é alcançada por content.assessment. Não há assessmentId aqui
+  /// de propósito: seria um dado derivado, sujeito a divergir do conteúdo.
+  content         StudyContent    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  progressRecords StudyProgress[]
+
+  @@index([planId, scheduledDate])
+  @@index([contentId])
+  @@map("study_activities")
+}
+
+/// Registro do que a pessoa efetivamente estudou.
+///
+/// DECISÃO CENTRAL: o progresso é ancorado no CONTEÚDO, não na atividade.
+/// Um recálculo cria atividades novas e aposenta as antigas; se o progresso
+/// dependesse da atividade, o histórico sumiria a cada recálculo. activityId é
+/// opcional e usa SetNull justamente para que o vínculo com a atividade seja
+/// uma informação extra, nunca um requisito para o registro sobreviver.
+model StudyProgress {
+  id         String  @id @default(uuid()) @db.Uuid
+  userId     String  @db.Uuid
+  contentId  String  @db.Uuid
+  activityId String? @db.Uuid
+
+  status       ActivityStatus
+  /// Tempo real dedicado, quando informado.
+  minutesSpent Int?
+  note         String?
+
+  recordedAt DateTime @default(now())
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content  StudyContent   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  activity StudyActivity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@index([userId, recordedAt])
+  @@index([contentId])
+  @@map("study_progress")
+}
+
+/// Material de apoio sugerido para um conteúdo.
+///
+/// Os materiais são sempre associados a um conteúdo específico, nunca à
+/// matéria inteira, para que a sugestão tenha relação com o que será estudado.
+model StudyResource {
+  id          String       @id @default(uuid()) @db.Uuid
+  contentId   String       @db.Uuid
+  title       String
+  description String?
+  type        ResourceType
+  url         String
+  /// Origem da sugestão (ex.: "youtube", "manual"), útil para auditar de onde
+  /// veio o material quando houver integração com busca externa.
+  source      String?
+
+  createdAt DateTime @default(now())
+
+  content StudyContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, url])
+  @@index([contentId])
+  @@map("study_resources")
+}
+
+/// Preferências de lembrete. Um registro por pessoa.
+model NotificationPreference {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+
+  studyReminderEnabled     Boolean @default(true)
+  /// Horário do lembrete diário, no formato HH:mm e no timezone do usuário.
+  reminderTime             String  @default("19:00")
+  pendingActivitiesEnabled Boolean @default(true)
+  /// Quantos dias antes de uma avaliação avisar.
+  assessmentReminderDays   Int     @default(3)
+  planUpdatedEnabled       Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // `node18` resolve módulos como o Node faz e, como este pacote não
+    // declara `"type": "module"`, emite CommonJS — o formato esperado pelo
+    // client gerado do Prisma e pelo binário nativo do Argon2.
+    "module": "node18",
+    "types": ["node"],
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.mts", "prisma.config.ts"],
+  "exclude": ["node_modules"]
+}
