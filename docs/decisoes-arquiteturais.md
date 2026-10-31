@@ -1,10 +1,11 @@
 # Decisões arquiteturais — Study Flow
 
 Este documento registra **por que** o projeto está estruturado assim. Ele não
-descreve funcionalidades: nenhuma funcionalidade foi implementada ainda. O
-objetivo é que, nas próximas etapas, cada decisão de implementação encontre
-um lugar pronto para encaixar — e que ninguém precise refazer uma escolha já
-discutida.
+é manual de uso: o README cobre isso. O objetivo é que cada decisão já tomada
+fique escrita com o motivo, para que ninguém precise refazer a discussão.
+
+Até aqui, a única funcionalidade implementada é a autenticação (seção 11).
+O resto do domínio tem a estrutura pronta e nenhuma implementação.
 
 ---
 
@@ -135,7 +136,7 @@ Estados: `PLANNED` (ainda vai acontecer), `IN_PROGRESS`, `DONE`, `SKIPPED`
 através da avaliação.
 
 **Regra permanente:** toda consulta filtra por `userId`. O helper
-`assertOwnership` em `src/middlewares/authenticate.ts` existe para o caso em
+`assertOwnership` em `src/middlewares/AuthenticateMiddleware.ts` existe para o caso em
 que o recurso é buscado por id antes de se saber de quem ele é.
 
 Isso atende diretamente "não permita que um usuário consulte ou modifique
@@ -258,3 +259,154 @@ pedir reset — é comando de quem está alterando o schema, não de quem está 
 rodando o projeto.
 
 O fluxo do time está no README, seção "Banco de dados e migrations".
+
+
+---
+
+## 11. Autenticação
+
+### 11.1 JWT de acesso, sem refresh token
+
+O enunciado pede JWT. A escolha foi o mais simples que atende: **um único
+token de acesso**, com validade controlada por `JWT_EXPIRES_IN` (7 dias no
+desenvolvimento), guardado no SecureStore do aparelho. Não existe refresh
+token nem tabela de sessões.
+
+**Contrapartida, assumida de propósito:** não há revogação no servidor. O
+logout apaga o token no aparelho, e um token roubado vale até expirar. Para
+um app de organização de estudos, em estágio inicial, o custo de uma tabela
+de sessões (consulta no banco a cada requisição, limpeza dos registros
+vencidos, invalidação em cascata) não se paga. Quando precisar revogar de
+verdade, o caminho é uma tabela `Session` com o `jti` do token; o payload já
+carrega `sub` e `email` e nada mais, então nada mais precisa mudar.
+
+O corpo da resposta devolve `expiresAt` junto do token. Assim o app sabe
+quando a sessão caduca sem precisar decodificar o JWT no cliente.
+
+### 11.2 Parâmetros do Argon2id ficam no código, não no `.env`
+
+`m = 19456 KiB, t = 2, p = 1`, que é a recomendação da OWASP para Argon2id.
+
+Eles estão em constantes comentadas em `src/security/password.ts`, e não em
+variável de ambiente, por um motivo prático: trocar um parâmetro muda o
+formato do hash gerado. Se isso virasse configuração, dois ambientes com
+valores diferentes produziriam hashes incompatíveis sem ninguém perceber.
+Mudança de parâmetro é alteração de código, revisada, e acompanhada de um
+plano de reidratação dos hashes existentes.
+
+### 11.3 Defesa contra enumeração de usuário
+
+Login com e-mail inexistente e login com senha errada devolvem o **mesmo**
+status e a **mesma** mensagem: `401` com "E-mail ou senha incorretos.".
+Qualquer diferença entre os dois casos entrega ao atacante a lista de quem
+tem conta.
+
+Mensagem igual não basta sozinha: se o servidor respondesse na hora quando o
+e-mail não existe e só depois de verificar o hash quando existe, o tempo de
+resposta diria a mesma coisa. Por isso, quando o usuário não é encontrado, o
+serviço roda `verify` contra um hash fictício (`DUMMY_HASH`) antes de
+recusar.
+
+O cadastro, por natureza, não tem como esconder que o e-mail já existe: ele
+precisa devolver `409`. É o preço de um formulário de cadastro utilizável.
+
+### 11.4 E-mail normalizado em código, sem `citext`
+
+A unicidade do e-mail no Postgres é sensível a maiúsculas: `Ana@x.com` e
+`ana@x.com` seriam duas contas. A garantia de que isso não acontece vem de
+`normalizeEmail` (`trim` mais `toLowerCase`) no pacote compartilhado,
+aplicada na camada de model antes de qualquer leitura ou escrita.
+
+**Por que não a extensão `citext`:** ela exige `CREATE EXTENSION` no banco,
+o que amarra o projeto a um Postgres onde você tem permissão para isso, e
+move uma regra de aplicação para dentro do schema, onde ela some da vista de
+quem lê o código. A normalização em um único ponto resolve o mesmo problema,
+é testável sem banco, e o teste de integração confirma que entrar com outra
+capitalização encontra a mesma conta.
+
+**Condição para isso valer:** todo acesso a `User` por e-mail passa por
+`UserModel.ts`. Uma consulta ao Prisma escrita fora dali pula a
+normalização.
+
+### 11.5 Rate limit em memória, e o que ele não resolve
+
+`src/middlewares/RateLimitMiddleware.ts` é uma janela deslizante por IP, sem
+dependência nova: 10 tentativas por 15 minutos no login, 20 por hora no
+cadastro.
+
+**Limitações, documentadas em vez de escondidas:** o contador vive na memória
+do processo, então ele zera a cada restart e cada instância da API tem o seu
+próprio. Com mais de um processo no ar, o limite efetivo é o número de
+instâncias vezes o configurado. Também é por IP, então um NAT grande (uma
+rede de faculdade, por exemplo) compartilha a cota.
+
+Para o estágio atual, com uma instância, isso atrasa um ataque de tentativa e
+erro o suficiente. Quando houver mais de um processo, a troca é por um
+contador no Redis, mantendo a mesma interface do middleware.
+
+### 11.6 Hash e token ficam em `src/security/`, fora de `services/`
+
+Hash de senha e assinatura de JWT são infraestrutura, não regra de negócio.
+Mantê-los em um diretório próprio deixa `AuthService.ts` testável sem
+conhecer Argon2id nem JWT, e preserva a regra de camadas da seção 3.
+
+### 11.7 Os schemas de auth moram no `packages/shared`
+
+É exatamente para isso que o pacote existe. O formulário no celular valida
+com a mesma regra que o servidor aplica na borda, sem duplicar a definição e
+sem risco de as duas divergirem.
+
+A exceção é "confirmar senha": é regra só do cliente, porque o servidor não
+recebe nem precisa do campo.
+
+Uma consequência que parece bug e não é: o schema de **login** aceita
+qualquer senha de até 128 caracteres, enquanto o de **cadastro** exige no
+mínimo 8. Se o login aplicasse a política, um `422` entregaria a regra de
+senha a quem está tentando adivinhar.
+
+### 11.8 Nada sensível em log
+
+Senha, hash e token não aparecem em log em nenhum ponto do fluxo. Verificado
+com `grep` nos logs do servidor depois de exercitar cadastro, login e
+`/auth/me`.
+
+### 11.9 Política de senha
+
+Exigências no **cadastro**, definidas em `packages/shared/src/schemas/auth.ts`:
+
+| Regra | Valor |
+|---|---|
+| Tamanho mínimo | 8 caracteres |
+| Tamanho máximo | 128 caracteres |
+| Letra minúscula | obrigatória (inclui acentuadas) |
+| Letra maiúscula | obrigatória (inclui acentuadas) |
+| Caractere especial | obrigatório |
+
+Três detalhes da implementação que merecem registro:
+
+- **Uma mensagem, não quatro.** As exigências de composição são avaliadas
+  juntas num `superRefine` que lista o que falta numa frase só ("A senha
+  precisa ter pelo menos 8 caracteres, uma letra maiúscula e um caractere
+  especial."). Quatro mensagens empilhadas abaixo do campo fariam a pessoa
+  corrigir um item por vez e tentar de novo.
+- **"Especial" é definido por exclusão:** o que não é letra, dígito nem
+  espaço. Assim `@`, `-`, `!` e até emoji contam, e `á` não conta, porque ela
+  já satisfaz a regra de minúscula e valer nas duas seria um furo.
+- **Nada de `\p{Lu}` e companhia.** As propriedades Unicode do regex dependem
+  de suporte do motor, e o app roda no Hermes. As classes usam intervalos
+  explícitos que cobrem o latim acentuado.
+
+A mesma política não é aplicada no **login** (ver 11.7): lá, qualquer senha de
+até 128 caracteres é sintaticamente aceita, e credencial errada é sempre o
+mesmo `401`.
+
+**Ressalva registrada, não escondida:** NIST SP 800-63B e a OWASP hoje
+desaconselham regras de composição, porque na prática elas empurram as pessoas
+para senhas curtas e previsíveis do tipo `Senha@123`, que estão em qualquer
+lista de ataque. A decisão de exigir maiúscula, minúscula e especial foi
+tomada pela responsável pelo projeto, com essa ressalva na mesa. O que
+compensaria de verdade, se um dia entrar, é subir o mínimo para 12 e checar a
+senha contra a lista do Have I Been Pwned por k-anonymity.
+
+O teto de 128 continua sendo defesa, não política: sem ele, uma senha enorme
+forçaria o servidor a gastar 19 MiB e o tempo de hash por tentativa.

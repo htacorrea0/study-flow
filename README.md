@@ -71,7 +71,9 @@ O Study Flow resolve isso em quatro movimentos:
 | Repositório | npm workspaces | App, API e contratos compartilhados no mesmo repositório. |
 
 As justificativas completas, incluindo o que foi descartado e por quê, estão
-em [`docs/decisoes-arquiteturais.md`](docs/decisoes-arquiteturais.md).
+em [`docs/decisoes-arquiteturais.md`](docs/decisoes-arquiteturais.md). Os
+tokens visuais, os componentes de interface e o mapa do Figma de referência
+estão em [`docs/design-system.md`](docs/design-system.md).
 
 ---
 
@@ -207,7 +209,7 @@ studyflow/
 │   │   ├── src/
 │   │   │   ├── config/           env validado com Zod, singleton do Prisma
 │   │   │   ├── routes/           Caminhos e middlewares de cada endpoint
-│   │   │   ├── controllers/      Lê a requisição, chama o service, responde
+│   │   │   ├── controllers/      Um arquivo por ação: lê, chama o service, responde
 │   │   │   ├── services/         Regra de negócio
 │   │   │   ├── models/           Acesso ao banco via Prisma, por agregado
 │   │   │   ├── dtos/             Entidade do banco → resposta pública
@@ -223,11 +225,12 @@ studyflow/
 │   │
 │   └── mobile/                   App React Native
 │       ├── src/
-│       │   ├── app/              Rotas do Expo Router (telas)
-│       │   ├── services/api/     Cliente Axios, URL base, erros
+│       │   ├── app/              Rotas do Expo Router (só reexportam a view)
+│       │   ├── views/            Uma pasta por tela; templates com `_` na frente
+│       │   ├── controllers/      Estado e regras de cada tela, espelhando views/
 │       │   ├── components/       Componentes reutilizáveis sem regra
-│       │   ├── features/         Uma pasta por funcionalidade
-│       │   ├── hooks/            Hooks compartilhados
+│       │   ├── services/         Cliente Axios, chamadas de API, armazenamento
+│       │   ├── hooks/            Hooks compartilhados por mais de uma tela
 │       │   ├── contexts/         Estado global (sessão)
 │       │   ├── models/           Tipos de apresentação
 │       │   ├── constants/        Configuração pública do app
@@ -241,10 +244,13 @@ studyflow/
 │       ├── types/                Uniões de domínio e envelope de erro
 │       └── schemas/              Schemas Zod comuns (uuid, data, paginação)
 │
-├── docs/                         Decisões arquiteturais
+├── docs/                         Decisões, design system e convenções de código
 ├── docker-compose.yml            PostgreSQL de desenvolvimento
 └── package.json                  Workspaces e scripts do dia a dia
 ```
+
+Onde cada arquivo mora e como ele se chama:
+[`docs/convencoes-de-codigo.md`](docs/convencoes-de-codigo.md).
 
 Cada pasta ainda sem código tem um `README.md` descrevendo sua
 responsabilidade e o que **não** pode entrar nela.
@@ -479,23 +485,50 @@ Windows.
 
 ## 11. Testes
 
+### Sem banco e sem Docker
+
 ```bash
 npm test
 ```
 
-Os testes atuais cobrem a infraestrutura que já existe:
+Roda em qualquer máquina, inclusive sem Docker no ar. O `app.ts` é separado do
+`server.ts`, então o Supertest exercita as rotas sem abrir porta, e o que
+depende do banco fica mockado.
 
-- **`tests/health.test.ts`** — as rotas de saúde respondem, e rota inexistente
-  devolve `404` no formato padrão de erro.
-- **`tests/errorHandler.test.ts`** — cada tipo de `AppError` vira o status
-  HTTP certo, erro de validação devolve `422` com a lista de campos, e erro
-  não previsto vira `500` sem vazar detalhe interno.
+| Arquivo | O que cobre |
+|---|---|
+| `tests/HealthRoutes.test.ts` | Rotas de saúde respondem; rota inexistente devolve `404` no formato padrão de erro. |
+| `tests/ErrorHandlerMiddleware.test.ts` | Cada tipo de `AppError` vira o status HTTP certo; erro de validação devolve `422` com a lista de campos; erro não previsto vira `500` sem vazar detalhe interno. |
+| `tests/security/password.test.ts` | O hash nunca é a senha; `verify` aceita a correta e rejeita a errada; dois hashes da mesma senha diferem (salt). |
+| `tests/security/token.test.ts` | Token assinado verifica; assinatura adulterada, token expirado e segredo errado falham. |
+| `tests/AuthService.test.ts` | Com o model mockado: e-mail já cadastrado vira `ConflictError`; usuário inexistente e senha errada produzem a **mesma** mensagem; e-mail com maiúsculas e espaços é normalizado antes da busca. |
+| `tests/AuthRoutes.test.ts` | Contrato das três rotas de auth, `422` com `issues`, `401` sem Bearer e `passwordHash` ausente de toda resposta. |
+| `tests/passwordPolicy.test.ts` | A política de senha aceita o que deve aceitar e recusa o que falta maiúscula, minúscula, caractere especial ou tamanho; o que falta vira uma mensagem só; o login não aplica a política. |
+| `tests/RateLimitMiddleware.test.ts` | A janela deslizante libera dentro do limite e devolve `429` ao estourar. |
 
-Eles **não precisam de banco nem de Docker**: o `app.ts` é separado do
-`server.ts`, então o Supertest testa as rotas sem abrir porta.
+### Com banco de verdade
 
-Conforme as funcionalidades chegarem, cada service ganha seu teste em
-`apps/api/tests/`.
+```bash
+npm run test:int
+```
+
+**Exige Docker.** O comando sobe o Postgres (`npm run db:up`), cria o banco
+`studyflow_test` se ele não existir, aplica as migrations nele
+(`apps/api/scripts/setup-test-db.mjs`, que roda igual em Linux e Windows) e só
+então executa `tests/integration/`.
+
+O teste percorre o caminho completo: cadastro `201`, login `200` com o mesmo
+e-mail escrito em outra capitalização, `/auth/me` com o token, `409` ao repetir
+o cadastro e, por último, uma consulta direta no banco conferindo que o campo
+gravado é o hash Argon2id e que a senha em texto não aparece em lugar nenhum.
+
+Os dois comandos são separados de propósito: `npm test` precisa continuar
+rodando na máquina de quem ainda não configurou o Docker.
+
+### Mobile
+
+O app ainda não tem runner de teste. `jest-expo` e biblioteca de teste de
+componente ficam para uma etapa própria.
 
 ---
 
@@ -524,8 +557,9 @@ Regras que sustentam isso:
 
 ### Mobile
 
-- Telas em `src/app/` (Expo Router) ficam finas; o que elas usam mora em
-  `src/features/<funcionalidade>/`.
+- **Rota, view e controller são três arquivos.** A rota em `src/app/` só
+  reexporta a view; a view em `src/views/<tela>/` desenha; o controller em
+  `src/controllers/<tela>/` guarda estado, validação e navegação.
 - Toda chamada passa pelo `apiClient`, que resolve a URL base, anexa o token
   e normaliza o erro.
 - O app **não conhece o Prisma**. Os tipos vêm de `@study-flow/shared`.
@@ -537,28 +571,46 @@ envelope de erro, paginação e schemas Zod comuns. Nada de Prisma, nada de
 Node, nada de React Native.
 
 Detalhes e trade-offs: [`docs/decisoes-arquiteturais.md`](docs/decisoes-arquiteturais.md).
+Tokens, componentes e o mapa do Figma: [`docs/design-system.md`](docs/design-system.md).
+Nomes de arquivo e organização de pastas:
+[`docs/convencoes-de-codigo.md`](docs/convencoes-de-codigo.md).
 
 ---
 
 ## 13. O que ainda não foi implementado
 
-Nada disto existe neste repositório hoje:
+### O que já existe
+
+**Autenticação completa, ponta a ponta:**
+
+- `POST /auth/signup`, `POST /auth/login` e `GET /auth/me` na API, com senha
+  guardada só como hash Argon2id, JWT de acesso, rate limit nas rotas de auth
+  e mensagem de erro genérica no login (não revela se o e-mail existe).
+- Telas de **login** e **cadastro** no app, seguindo o Figma de referência
+  (tokens e padrões em [`docs/design-system.md`](docs/design-system.md)), com o token guardado no
+  SecureStore do aparelho e as rotas internas protegidas por uma guarda de
+  sessão.
+- O `middleware/authenticate` deixou de ser esqueleto: ele valida o Bearer e
+  popula `req.user`.
+
+### O que ainda não existe
 
 **Interface**
-- Telas de cadastro, login, calendário, detalhe do dia, matérias, avaliações,
-  conteúdos, disponibilidade e configurações.
-- Qualquer componente visual de funcionalidade. A rota inicial é um
-  placeholder sem interação, criada só porque o Expo Router exige ao menos uma
-  rota para o app subir.
+- Telas de calendário, detalhe do dia, matérias, avaliações, conteúdos,
+  disponibilidade e configurações. Depois do login, o app cai num placeholder
+  autenticado.
+- Recuperação de senha, onboarding e login com Google ou Apple.
 
 **Backend**
 - CRUD de matérias, avaliações, conteúdos e disponibilidade.
-- Autenticação funcional. Existe o esqueleto do middleware e o campo
-  `passwordHash` no schema; o fluxo de cadastro/login não foi escrito.
 - Algoritmo de distribuição do plano de estudos e as regras de
   redistribuição. Existe a interface `StudyPlanner` e os tipos de entrada e
-  saída — nenhuma implementação, nem fictícia.
+  saída: nenhuma implementação, nem fictícia.
 - Notificações agendadas.
+- Revogação de sessão no servidor. Não há refresh token nem tabela de
+  sessões; o logout apaga o token no aparelho. O motivo e a contrapartida
+  estão em [`docs/decisoes-arquiteturais.md`](docs/decisoes-arquiteturais.md),
+  seção 11.
 
 **Integrações**
 - Busca de conteúdo no YouTube ou na internet.
