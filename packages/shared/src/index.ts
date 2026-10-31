@@ -11,4 +11,6 @@
 
 export * from './types/domain';
 export * from './types/api';
+export * from './types/auth';
 export * from './schemas/common';
+export * from './schemas/auth';
