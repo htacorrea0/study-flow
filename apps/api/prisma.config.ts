@@ -18,6 +18,8 @@ export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
     path: 'prisma/migrations',
+    /** `npm run db:seed` na raiz, ou `prisma db seed` dentro de apps/api. */
+    seed: 'tsx prisma/seed.ts',
   },
   datasource: {
     url: process.env.DATABASE_URL ?? '',

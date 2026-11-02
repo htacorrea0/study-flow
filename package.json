@@ -22,6 +22,7 @@
     "db:deploy": "npm run -w @study-flow/api prisma:deploy",
     "db:status": "npm run -w @study-flow/api prisma:status",
     "db:studio": "npm run -w @study-flow/api prisma:studio",
+    "db:seed": "npm run -w @study-flow/api prisma:seed",
     "dev:api": "npm run db:up && npm run db:deploy && npm run -w @study-flow/api dev",
     "dev:mobile": "npm run -w @study-flow/mobile start",
     "typecheck": "npm run -w @study-flow/shared typecheck && npm run -w @study-flow/api typecheck && npm run -w @study-flow/mobile typecheck",

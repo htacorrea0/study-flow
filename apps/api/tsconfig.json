@@ -9,6 +9,6 @@
     "noEmit": true,
     "rootDir": "."
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.mts", "prisma.config.ts"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "prisma/**/*.ts", "vitest.config.mts", "prisma.config.ts"],
   "exclude": ["node_modules"]
 }

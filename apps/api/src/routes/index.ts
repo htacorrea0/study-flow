@@ -1,6 +1,8 @@
 import { Router } from 'express';
 
 import { authRoutes } from './AuthRoutes';
+import { calendarRoutes } from './CalendarRoutes';
+import { dashboardRoutes } from './DashboardRoutes';
 import { healthRoutes } from './HealthRoutes';
 
 /**
@@ -22,3 +24,5 @@ export const routes = Router();
 
 routes.use('/health', healthRoutes);
 routes.use('/auth', authRoutes);
+routes.use('/dashboard', dashboardRoutes);
+routes.use('/calendar', calendarRoutes);
