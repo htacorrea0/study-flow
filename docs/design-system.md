@@ -50,6 +50,19 @@ captura de tela.
 | `border` | `#e2e8f0` | Borda de input e de card |
 | `success` | `#10b981` | Ação de estudo, texto e borda do bloco verde |
 | `successSoft` | `#e6fdf4` | Fundo do bloco verde |
+| `primaryGlow` | `#eef2ff` | Fundo da aba ativa na barra inferior |
+| `primaryLabel` | `#e0e7ff` | Rótulo em caixa alta sobre o card índigo da meta |
+| `primaryBody` | `#c7d2fe` | Texto de apoio sobre o card índigo da meta |
+| `rose` | `#f43f5e` | Texto do badge de sequência, tom de matéria |
+| `roseSoft` | `#fff1f2` | Fundo do badge de sequência |
+| `amber` | `#f59e0b` | Tom de matéria |
+| `purple` | `#a855f7` | Tom de matéria |
+
+Os quatro últimos são **tons de matéria**: valores que o Figma usa nas telas
+de exemplo e que o seed adota como padrão. A cor real de cada matéria é
+escolhida pela pessoa e chega do banco como hexadecimal, então os componentes
+recebem a cor por prop, não por token. O bloco de 44px do item de sessão usa
+essa cor a 10% de opacidade (`utils/color.ts`).
 
 Dois valores **não vêm do Figma** e estão marcados como tal no arquivo:
 
@@ -74,9 +87,19 @@ Duas famílias, ambas Google Fonts com licença OFL, carregadas por
 | `caption` | Manrope Regular (400) | 13 / 18 | `textSubtle` |
 | `inlineLink` | Manrope Bold (700) | 14 / 20 | `primary` |
 | `footerText` | Manrope Regular (400) | 14 / 20 | `textMuted` |
+| `sectionTitle` | Outfit Bold (700) | 18 / 24 | `ink` |
+| `monthTitle` | Outfit ExtraBold (800) | 20 / 28 | `ink` |
+| `cardTitle` | Outfit ExtraBold (800) | 26 / 32 | `white` |
+| `itemTitle` | Outfit Bold (700) | 15 / 20 | `ink` |
+| `badgeStrong` | Manrope Bold (700) | 13 / 18 | `primary` |
+| `badgeSoft` | Manrope Regular (400) | 11 / 14 | `textSubtle` |
+| `weekdayLabel` | Manrope Bold (700) | 12 / 16 | `textSubtle` |
+| `dayNumber` | Manrope Medium (500) | 13 / 18 | `ink` |
+| `tabLabelActive` | Manrope Bold (700) | 11 / 14 | `primary` |
+| `tabLabel` | Manrope Medium (500) | 11 / 14 | `textMuted` |
 
-O Figma também usa Outfit Bold 20 em títulos de seção. Esse estilo entra no
-tema quando a primeira tela com seções chegar.
+O peso **Manrope Medium (500)** entrou com essas telas e está registrado no
+`useFonts` de `app/_layout.tsx`, pelo subcaminho, como os outros.
 
 **Pegadinha de bundle:** importe cada peso pelo subcaminho
 (`@expo-google-fonts/outfit/700Bold`), nunca pelo índice do pacote. O índice
@@ -108,6 +131,8 @@ ao padding da página no arquivo inteiro.
 |---|---|---|
 | `control` | 12 | Input, botão |
 | `card` | 16 | Card |
+| `cardLarge` | 24 | Card da meta do dia e card do calendário |
+| `ring` | 14 | Círculo do número do dia na grade (28 de lado) |
 | `pill` | 100 | Badge, barra de progresso |
 
 ---
@@ -139,10 +164,15 @@ apps/mobile/src/components/
 │   ├── ScreenContainer.tsx   fundo canvas + safe area + teclado + scroll + rodapé opcional
 │   ├── TextField.tsx         label · ícone · input · olho de senha · mensagem de erro
 │   ├── Button.tsx            variantes primary e secondary, estados loading e disabled
-│   └── InlineLink.tsx        texto com um trecho clicável (padrão do rodapé do login)
+│   ├── InlineLink.tsx        texto com um trecho clicável (padrão do rodapé do login)
+│   ├── Card.tsx              superfície branca com borda, raio 16 ou 24
+│   ├── Avatar.tsx            iniciais do nome num círculo de 48
+│   └── ProgressRing.tsx      anel de 80 em SVG, trilho + arco + percentual
+├── navigation/
+│   └── BottomTabBar.tsx      barra de abas das Tabs do Expo Router
 └── icons/                    SVG do Figma renderizado por react-native-svg
-    ├── MailIcon  LockIcon  EyeOffIcon  EyeIcon  UserIcon
-    └── createIcon.tsx        fábrica: injeta tamanho e cor no mesmo viewBox 18
+    ├── 21 ícones do Lucide
+    └── createIcon.tsx        fábrica: injeta tamanho e cor; viewBox 18 por padrão, 24 opcional
 ```
 
 O formulário do login é o **único padrão de entrada de dados do arquivo
@@ -167,6 +197,13 @@ arquivo:
 - **`UserIcon`**: existe, mas no nó `5:1468` da tela de perfil, num viewBox de
   20. Foi reescalado por 0,9 para cair na mesma grade de 18 dos outros, de
   modo que a espessura de traço fique igual em todos os campos.
+
+Os dezesseis ícones que o dashboard e o calendário trouxeram (`flame`, `play`,
+`arrow-right`, `chevron-left`, `chevron-right`, `calendar`, `home`,
+`book-open`, `clock`, `bar-chart-2`, `zap`, `map`, `droplet`, `globe`,
+`check`, `flag`) são traçados do Lucide na grade nativa de 24. Para isso, `createIcon` ganhou um
+terceiro parâmetro opcional `viewBox`, com `'0 0 18 18'` como padrão: os cinco
+ícones do login continuam idênticos e os novos entram sem reescalar à mão.
 
 Se um ícone novo for preciso, o caminho é o mesmo: exportar o nó do Figma e
 passar o `d` para `createIcon`. Trocar por uma fonte de ícones
@@ -206,12 +243,12 @@ dica e a validação não tenham como divergir.
 | `5:11` | onboarding | Fora do escopo |
 | `5:36` | **login** | **Implementada** |
 | (sem nó) | **cadastro** | **Implementada.** Não existe no Figma: derivada do login, sem inventar elemento visual novo |
-| `5:84` | home-dashboard | Futuro. Casa natural do calendário |
-| `5:168` | subjects | Futuro. É a "tela de matérias" do enunciado |
-| `5:874` | calendar-schedule | Futuro. "Calendário" e "detalhe do dia" |
-| `5:438` | progress-stats | Futuro. Acompanhamento de progresso |
+| `5:84` | **home-dashboard** | **Implementada** |
+| `5:168` | subjects | Futuro. A aba Matérias existe e abre uma tela em branco |
+| `5:874` | **calendar-schedule** | **Implementada.** Cobre "calendário" e "detalhe do dia" |
+| `5:438` | progress-stats | Futuro. A aba Progresso existe e abre uma tela em branco |
 | `5:1129` | profile-settings | Futuro. Onde mora a disponibilidade semanal |
-| `5:303` | study-timer (Pomodoro) | **Fora do enunciado** |
+| `5:303` | study-timer (Pomodoro) | **Fora do enunciado.** A aba Timer existe e abre uma tela em branco |
 | `5:371` | flashcards | **Fora do enunciado** |
 | `5:542` | notes | **Fora do enunciado** |
 | `5:1222` | achievements | **Fora do enunciado** |
@@ -220,6 +257,28 @@ dica e a validação não tenham como divergir.
 Cinco das doze telas são funcionalidades que o documento do projeto não
 descreve. Elas ficam registradas aqui como material visual reaproveitável, e
 **não** como backlog.
+
+### 5.1 A barra de abas
+
+A barra inferior (`5:1108`) tem quatro abas de 76px com `justify-between`. O
+app tem cinco, porque o calendário ganhou aba própria, e cinco de 76 não
+cabem nos 370px úteis: cada aba passou a `flex: 1`. Altura 72, borda superior
+`border`, glow `px 16 py 4` com raio 16 em `primaryGlow`, ícone 20 e rótulo 11
+seguem o arquivo.
+
+Matérias, Timer e Progresso abrem a mesma tela em branco
+(`views/_templates/_emptyScreen.tsx`), que diz em uma linha que a tela chega
+numa próxima etapa. O botão de sair da conta mora provisoriamente no rodapé da
+aba Progresso, até a tela de perfil existir.
+
+### 5.2 As divergências aceitas
+
+As sete divergências deliberadas entre o Figma e o que foi implementado
+(horário da sessão, foto de perfil, ícone por matéria, botão de voltar do
+calendário, número de abas, as três letras do cabeçalho da grade e o anel que
+marca o dia da prova) estão
+justificadas uma a uma em
+[`decisoes-arquiteturais.md`](decisoes-arquiteturais.md), seção 12.4.
 
 ---
 

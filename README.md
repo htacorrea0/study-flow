@@ -593,19 +593,42 @@ Nomes de arquivo e organização de pastas:
 - O `middleware/authenticate` deixou de ser esqueleto: ele valida o Bearer e
   popula `req.user`.
 
+**Dashboard e calendário, lendo dados de verdade:**
+
+- `GET /dashboard`, `GET /calendar?month=AAAA-MM` e `GET /calendar/:date` na
+  API, todas atrás do `authenticate`. Toda consulta filtra pelo usuário da
+  sessão: as atividades não têm `userId` próprio, então o filtro passa pelo
+  plano (`plan: { userId }`), e isso é coberto por teste de integração.
+- Telas de **dashboard** (meta do dia, sequência, próximas sessões) e
+  **calendário** (grade do mês com pontos por matéria e agenda do dia
+  selecionado), com os três estados: carregando, erro e vazio. O dia de uma
+  prova ou entrega ganha um anel na cor da matéria, e o prazo aparece no topo
+  da agenda daquele dia. Avaliação não depende de plano ativo: o anel aparece
+  mesmo num mês sem sessão marcada.
+- Navegação por abas: Início, Matérias, Calendário, Timer e Progresso.
+  Matérias, Timer e Progresso ainda são telas em branco, e dizem isso.
+- **Seed** com dados fictícios (`npm run db:seed`): um usuário de
+  demonstração com matérias, avaliações, disponibilidade, um plano ativo e
+  progresso suficiente para uma sequência real.
+
 ### O que ainda não existe
 
 **Interface**
-- Telas de calendário, detalhe do dia, matérias, avaliações, conteúdos,
-  disponibilidade e configurações. Depois do login, o app cai num placeholder
-  autenticado.
+- Telas de matérias, avaliações, conteúdos, disponibilidade, cronômetro,
+  progresso e perfil. As três últimas abas abrem uma tela em branco.
+- Marcar uma atividade como concluída pela tela. Hoje o progresso só entra
+  pelo seed.
 - Recuperação de senha, onboarding e login com Google ou Apple.
+- Foto de perfil. O avatar mostra as iniciais do nome.
 
 **Backend**
-- CRUD de matérias, avaliações, conteúdos e disponibilidade.
+- CRUD de matérias, avaliações, conteúdos e disponibilidade. As três rotas de
+  leitura existem; nenhuma rota de escrita.
 - Algoritmo de distribuição do plano de estudos e as regras de
   redistribuição. Existe a interface `StudyPlanner` e os tipos de entrada e
-  saída: nenhuma implementação, nem fictícia.
+  saída: nenhuma implementação, nem fictícia. O seed grava as atividades
+  direto, marcadas com `algorithmVersion: 'seed-v1'` para que isso fique
+  explícito no banco.
 - Notificações agendadas.
 - Revogação de sessão no servidor. Não há refresh token nem tabela de
   sessões; o logout apaga o token no aparelho. O motivo e a contrapartida
@@ -617,8 +640,10 @@ Nomes de arquivo e organização de pastas:
 - Qualquer integração com IA (Gemini ou outra).
 - Qualquer API externa.
 
-**Dados**
-- Seed com dados fictícios. O banco sobe vazio, de propósito.
+**Testes**
+- O app mobile ainda não tem runner de testes. A aritmética do calendário
+  (`apps/mobile/src/utils/date.ts`) foi conferida à mão e continua sem teste
+  automatizado.
 
 ---
 

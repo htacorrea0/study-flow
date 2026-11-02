@@ -410,3 +410,177 @@ senha contra a lista do Have I Been Pwned por k-anonymity.
 
 O teto de 128 continua sendo defesa, não política: sem ele, uma senha enorme
 forçaria o servidor a gastar 19 MiB e o tempo de hash por tentativa.
+
+---
+
+## 12. Dashboard e calendário
+
+### 12.1 Dados de verdade sem CRUD: seed mais leitura
+
+As duas telas precisam de matérias, avaliações, disponibilidade, plano e
+progresso. Nada disso tem rota de escrita ainda, e o algoritmo de
+distribuição é só uma interface (seção 6). Havia duas saídas: dados falsos
+dentro do app, ou dados de verdade no banco.
+
+Escolhemos a segunda. Um seed cria um usuário de demonstração completo, e as
+telas leem do Postgres pelas três rotas novas. O custo é um arquivo a mais; o
+ganho é que o isolamento por usuário, a paginação, o fuso e os estados de erro
+são exercitados desde o primeiro dia, em vez de aparecerem na etapa em que o
+CRUD entrar.
+
+**O seed grava atividades sem passar por planner.** Ele não tem como passar: o
+planner não existe. Para que isso não vire uma mentira silenciosa no banco, o
+plano criado pelo seed leva `algorithmVersion: 'seed-v1'`. Quando o algoritmo
+de verdade entrar, dá para distinguir um plano semeado de um plano calculado
+com uma consulta, sem adivinhação.
+
+O seed também é **restrito ao usuário de demonstração**: ele apaga e recria só
+os dados daquele `userId`, dentro de uma transação. Nunca limpa o banco.
+
+### 12.2 Isolamento quando a entidade não tem `userId`
+
+A regra da seção 5.4 diz que toda consulta filtra por usuário. `StudyActivity`
+e `Content` não têm `userId` próprio: o dono chega pelo pai. O filtro então
+passa pelo caminho, não pelo campo:
+
+- atividade: `{ planId, plan: { userId } }`
+- conteúdo: `{ assessment: { userId } }`
+
+Confiar só no `planId` vindo da requisição seria o furo clássico: o id é
+adivinhável e não prova posse. O teste de integração
+`tests/integration/dashboard.int.test.ts` semeia dois usuários e verifica que
+o usuário A não enxerga nenhuma atividade, cor ou minuto do usuário B em
+nenhuma das três rotas.
+
+### 12.3 Datas sem biblioteca
+
+`apps/mobile/src/utils/date.ts` monta a matriz do mês, formata o rótulo e
+compara datas ISO, sem dependência nova.
+
+O que seria difícil aqui não é a aritmética: é nome de mês em português e
+conversão de fuso. Os dois já estão resolvidos, o primeiro pelo `Intl` nativo
+e o segundo pelo backend, que devolve tudo em `AAAA-MM-DD` já no fuso do
+usuário. O que sobra é contar dias, e isso é uma função com teste de mesa
+óbvio.
+
+`date-fns` entraria para resolver um problema que não temos.
+`react-native-calendars` traria uma grade com estilo próprio que precisaria
+ser domada célula a célula para bater com o Figma, o que custa mais do que
+escrever a matriz.
+
+Todo o cálculo é feito em UTC (`Date.UTC`, `getUTC*`). Datas civis não têm
+hora, e usar o relógio local abriria a porta para o dia virar sozinho perto da
+meia-noite ou no horário de verão.
+
+**Pendência registrada:** o utilitário ainda não tem teste automatizado,
+porque o app mobile não tem runner. A matriz foi conferida à mão (outubro de
+2026, fevereiro de 2026 e a virada de novembro).
+
+### 12.4 Onde o Figma não cabe no modelo, e o que fizemos
+
+Divergências deliberadas, para que não sejam lidas como descuido:
+
+1. **Horário da sessão.** O Figma mostra "11:30 AM". `StudyActivity` tem
+   `scheduledDate @db.Date` e `position`, sem hora, de propósito: o plano
+   distribui dias, não agenda relógio. Inventar um horário seria inventar
+   funcionalidade. O badge mostra a duração estimada e o prazo da avaliação
+   ("Prova em 3 dias"), na mesma caixa e na mesma tipografia.
+2. **Avatar com foto.** Não há campo de foto no modelo. O círculo de 48px
+   mostra as iniciais do nome. Upload entra junto com a tela de perfil.
+3. **Ícone por matéria.** O Figma dá um ícone diferente a cada matéria, e o
+   modelo só guarda nome e cor. O ícone é escolhido de uma paleta fixa por
+   hash do nome da matéria: estável entre aberturas, decorativo, e nunca
+   apresentado como dado do usuário.
+4. **Botão de voltar no cabeçalho do calendário.** O calendário é uma aba, não
+   uma tela empilhada: não há para onde voltar. O botão da esquerda saiu e o
+   da direita virou o atalho "ir para hoje".
+5. **Cinco abas em vez de quatro.** A barra do Figma tem quatro abas de 76px
+   com `justify-between`; cinco não cabem nos 370px úteis. Cada aba passou a
+   `flex: 1`. Altura, glow, raio, ícone e rótulo seguem idênticos.
+6. **Cabeçalho da grade com três letras, não uma.** O Figma usa a inicial do
+   dia da semana, que em inglês ainda se lê: M T W T F S S. Em português a
+   inicial dá S T Q Q S S D, e as colunas de segunda, sexta e sábado ficam
+   todas com a mesma letra. O cabeçalho mostra `Seg Ter Qua Qui Sex Sáb Dom`,
+   que cabe nos 40px da célula e mantém peso, tamanho e cor do Figma.
+7. **Marca do dia da prova, que o Figma não desenha.** A grade do arquivo só
+   tem os pontos de sessão. O dia do prazo ganhou um anel na célula, descrito
+   em 12.9: é acréscimo, não leitura divergente do desenho.
+
+### 12.5 A frase do card da meta sai do percentual
+
+A linha grande do card índigo é texto no Figma ("Almost there!"), não número.
+Mantê-la como texto evita o terceiro número na mesma caixa, já que o anel e a
+linha de apoio abaixo dela já mostram o progresso em percentual e em minutos.
+A frase é derivada do mesmo `percent` que desenha o anel, de modo que nunca
+pode contradizer o resto do card: sem meta reservada, "Dia livre"; em 0%,
+"Vamos começar?"; abaixo de 50%, "Bom começo!"; abaixo de 100%, "Quase lá!";
+daí em diante, "Meta batida!".
+
+### 12.6 As três aparências do item de sessão
+
+`StudyActivity` tem três estados, e a agenda do calendário devolve as sessões
+do dia em qualquer um deles. Desenhar os três iguais faria a tela esconder a
+única informação que o dia passado tem a dar. O item lê `status`:
+
+- `PLANNED`: o item padrão, com o prazo da avaliação no canto.
+- `IN_PROGRESS`: a linha do prazo vira "Em andamento" em índigo, a mesma cor
+  que o app já usa para o que está ativo (aba selecionada, dia escolhido).
+- `DONE`: o quadrado da matéria troca o ícone pelo `check`, o título fica
+  riscado e em cinza, e a linha do prazo vira "Concluída".
+
+Nos dois estados que não são `PLANNED` o prazo sai da caixa de propósito: o
+estado é a informação mais útil ali, e o prazo continua visível nas outras
+sessões da mesma avaliação. O dashboard não é afetado, porque a lista de
+próximas sessões já filtra por `PLANNED` e `IN_PROGRESS`.
+
+### 12.7 Dois pontos por dia, sem repetir cor
+
+Cada célula do calendário mostra até dois pontos coloridos. Quando o dia tem
+duas sessões da mesma matéria, a cor repetida é descartada em vez de ocupar o
+segundo ponto: dois pontos idênticos não informam nada, e gastariam o único
+espaço que mostraria a segunda matéria do dia.
+
+### 12.8 Sair da conta mora provisoriamente no Progresso
+
+O botão de sair vivia na tela placeholder que o dashboard substituiu. Ele foi
+para o rodapé da aba Progresso, que ainda é uma tela em branco, com comentário
+dizendo que o lugar dele é a tela de perfil. Sem isso, a única forma de sair
+seria limpar os dados do app.
+
+### 12.9 O dia da prova é marcado à parte da sessão
+
+A grade mostrava só sessões de estudo do plano ativo. O dia da prova ou da
+entrega não tinha marca própria: ele aparecia apenas como texto dentro do
+item ("Prova em 3 dias"). Quem abria o mês não via a data que não pode ser
+remarcada.
+
+As duas coisas são diferentes e nenhuma substitui a outra: a sessão responde
+"quando eu estudo", a avaliação responde "quando é". Por isso o prazo **não**
+virou mais um ponto colorido. Ele virou um **anel** na cor da matéria em volta
+do número do dia, e os pontos continuam significando só sessão. O anel
+sobrevive ao dia selecionado, que já preenche o círculo de índigo, e some
+junto com o mês quando a pessoa navega.
+
+Três consequências que valem registro:
+
+- **O contrato cresceu.** `CalendarDayMark` ganhou `assessments`, e
+  `CalendarDayResponse` também: a grade precisa da cor para desenhar o anel, e
+  o leitor de tela precisa do título ("Dia 12, prova"). Um booleano não daria
+  conta dos dois.
+- **A avaliação não depende de plano ativo.** `Assessment` tem `userId`
+  próprio, então a consulta filtra direto, sem passar por `plan`. Isso é de
+  propósito: a prova existe assim que é cadastrada, e um calendário que
+  esconde o dia dela por falta de plano esconde justamente o que não se pode
+  esquecer. Sem plano, o mês vem sem pontos mas com os anéis.
+- **`dueAt` é instante, `scheduledDate` é data civil.** O prazo é convertido
+  para o dia do relógio da pessoa antes de virar marca. Uma entrega às 23h em
+  São Paulo é dia 20 para quem entrega, mesmo sendo dia 21 em UTC. A janela da
+  consulta usa `dayBoundsUtc`, meia-aberta, pela mesma razão.
+
+Na agenda do dia a avaliação entra **antes** das sessões, com a mesma caixa do
+item de sessão para alinhar na mesma grade, mas com o quadrado da matéria em
+cor cheia e ícone branco, em vez dos 10% de tinta da sessão: o prazo é o
+compromisso do dia e precisa pesar mais do que um estudo que pode ser
+remarcado. A frase "Nenhuma sessão de estudo marcada para este dia" continua
+aparecendo embaixo de um prazo sem sessão, porque "a prova é hoje e não há
+nada marcado" é exatamente o que vale a pena saber.
