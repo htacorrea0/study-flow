@@ -15,6 +15,12 @@ export const colors = {
   primary: '#4f46e5',
   /** Títulos de tela. */
   primaryDark: '#3730a3',
+  /** Fundo da aba ativa na barra inferior. */
+  primaryGlow: '#eef2ff',
+  /** Rótulo em caixa alta sobre o card índigo da meta do dia. */
+  primaryLabel: '#e0e7ff',
+  /** Texto de apoio sobre o card índigo da meta do dia. */
+  primaryBody: '#c7d2fe',
 
   /** Texto forte: label de campo e valor digitado. */
   ink: '#1e1b4b',
@@ -29,6 +35,19 @@ export const colors = {
   /** Confirmação e ação de estudo. */
   success: '#10b981',
   successSoft: '#e6fdf4',
+
+  /**
+   * Tons de matéria.
+   *
+   * Aparecem como fundo do badge de sequência e como cor dos pontos do
+   * calendário. A cor de cada matéria é escolhida pela pessoa e chega do
+   * banco como hexadecimal: estes tokens são os valores que o Figma usa nas
+   * telas de exemplo, e servem de padrão ao seed, não de lista fechada.
+   */
+  rose: '#f43f5e',
+  roseSoft: '#fff1f2',
+  amber: '#f59e0b',
+  purple: '#a855f7',
 
   /**
    * Erro de formulário.

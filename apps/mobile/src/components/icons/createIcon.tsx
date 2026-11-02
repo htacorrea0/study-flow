@@ -20,11 +20,16 @@ export type IconProps = {
  *
  * O `stroke` fixo do export dá lugar à cor recebida, para que o mesmo ícone
  * sirva ao estado normal, ao de foco e ao de erro de um campo.
+ *
+ * `viewBox` existe porque nem todo glifo vem da mesma grade: os cinco ícones
+ * dos formulários foram exportados do Figma em 18, e os do dashboard e do
+ * calendário usam o traçado original do Lucide, desenhado em 24. Passar a
+ * grade é mais seguro do que reescalar cada `d` à mão.
  */
-export function createIcon(name: string, body: string): FC<IconProps> {
+export function createIcon(name: string, body: string, viewBox = '0 0 18 18'): FC<IconProps> {
   const Icon: FC<IconProps> = ({ size = sizes.inputIcon - 2, color = colors.textMuted }) => (
     <SvgXml
-      xml={`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 18 18" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`}
+      xml={`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="${viewBox}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`}
       width={size}
       height={size}
     />

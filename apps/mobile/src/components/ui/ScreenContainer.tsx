@@ -8,6 +8,13 @@ type ScreenContainerProps = {
   children: ReactNode;
   /** Conteúdo fixado no rodapé, fora da rolagem. Ex.: o link de troca de tela. */
   footer?: ReactNode;
+  /**
+   * Tira o padding horizontal, deixando cada bloco com o seu.
+   *
+   * O dashboard e o calendário precisam disso: o Figma alterna 24 nos
+   * títulos e 20 nas listas, para o cartão respirar menos que o texto.
+   */
+  edgeToEdge?: boolean;
 };
 
 /**
@@ -22,7 +29,7 @@ type ScreenContainerProps = {
  * O que é código: fundo `canvas`, padding de 24 e o conteúdo rolável acima de
  * um rodapé fixo, exatamente a composição do nó `5:36`.
  */
-export function ScreenContainer({ children, footer }: ScreenContainerProps) {
+export function ScreenContainer({ children, footer, edgeToEdge = false }: ScreenContainerProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -36,7 +43,7 @@ export function ScreenContainer({ children, footer }: ScreenContainerProps) {
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, edgeToEdge ? styles.contentEdgeToEdge : null]}
           // Sem isto, o primeiro toque com o teclado aberto só o fecha: o
           // botão de enviar exigiria dois toques.
           keyboardShouldPersistTaps="handled"
@@ -69,6 +76,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: sizes.pagePadding,
     paddingTop: sizes.pagePadding,
     paddingBottom: sizes.pagePadding,
+  },
+  contentEdgeToEdge: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   footer: {
     paddingHorizontal: sizes.pagePadding,

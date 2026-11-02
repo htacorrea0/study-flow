@@ -1,6 +1,23 @@
 export { type IconProps } from './createIcon';
+
+export { ArrowRightIcon } from './ArrowRightIcon';
+export { BarChartIcon } from './BarChartIcon';
+export { BookOpenIcon } from './BookOpenIcon';
+export { CalendarIcon } from './CalendarIcon';
+export { CheckIcon } from './CheckIcon';
+export { ChevronLeftIcon } from './ChevronLeftIcon';
+export { ChevronRightIcon } from './ChevronRightIcon';
+export { ClockIcon } from './ClockIcon';
+export { DropletIcon } from './DropletIcon';
 export { EyeIcon } from './EyeIcon';
 export { EyeOffIcon } from './EyeOffIcon';
+export { FlagIcon } from './FlagIcon';
+export { FlameIcon } from './FlameIcon';
+export { GlobeIcon } from './GlobeIcon';
+export { HomeIcon } from './HomeIcon';
 export { LockIcon } from './LockIcon';
 export { MailIcon } from './MailIcon';
+export { MapIcon } from './MapIcon';
+export { PlayIcon } from './PlayIcon';
 export { UserIcon } from './UserIcon';
+export { ZapIcon } from './ZapIcon';

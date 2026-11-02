@@ -1,4 +1,4 @@
 /**
- * Rota `/(app)` - a primeira tela de quem entrou.
+ * Rota `/(app)` - o dashboard, primeira tela de quem entrou.
  */
-export { default } from '@/views/home/home';
+export { default } from '@/views/dashboard/dashboard';

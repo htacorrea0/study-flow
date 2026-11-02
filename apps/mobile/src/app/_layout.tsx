@@ -2,6 +2,7 @@
 // nove variações de cada família, e o Metro empacota todas as que enxerga.
 // São 55 KB por arquivo que o app baixaria sem nunca desenhar com eles.
 import { Manrope_400Regular } from '@expo-google-fonts/manrope/400Regular';
+import { Manrope_500Medium } from '@expo-google-fonts/manrope/500Medium';
 import { Manrope_600SemiBold } from '@expo-google-fonts/manrope/600SemiBold';
 import { Manrope_700Bold } from '@expo-google-fonts/manrope/700Bold';
 import { Outfit_700Bold } from '@expo-google-fonts/outfit/700Bold';
@@ -32,6 +33,7 @@ export default function RootLayout() {
     Outfit_700Bold,
     Outfit_800ExtraBold,
     Manrope_400Regular,
+    Manrope_500Medium,
     Manrope_600SemiBold,
     Manrope_700Bold,
   });
