@@ -32,3 +32,21 @@ export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 if (!env.isProduction) {
   globalForPrisma.prisma = prisma;
 }
+
+/**
+ * O client dentro de uma `$transaction`.
+ *
+ * Os models das escritas aceitam este tipo para que a mesma função sirva
+ * dentro e fora de uma transação: sem isso, recalcular o plano exigiria uma
+ * segunda cópia de cada consulta, e duas cópias é como um filtro por `userId`
+ * some de uma delas.
+ */
+export type TransactionClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$extends'
+>;
+
+/** O client padrão quando nenhuma transação foi aberta. */
+export function clientOrTransaction(tx?: TransactionClient): TransactionClient {
+  return tx ?? prisma;
+}

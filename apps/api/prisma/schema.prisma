@@ -54,6 +54,14 @@ enum ResourceType {
   OTHER
 }
 
+/// Quanto a pessoa quer se aprofundar numa matéria. Vira número de passadas
+/// por conteúdo no planejamento: uma, duas ou três.
+enum StudyDepth {
+  BASIC
+  INTERMEDIATE
+  INTENSE
+}
+
 enum Weekday {
   MONDAY
   TUESDAY
@@ -162,6 +170,13 @@ model StudyContent {
   /// Peso relativo dentro da avaliação. Quanto maior, mais cedo o algoritmo
   /// aloca o conteúdo quando o tempo disponível não cobre tudo.
   priority Int @default(0)
+
+  /// Profundidade desejada para este conteúdo. Quanto maior, mais passadas
+  /// (e mais dias) ele recebe no plano. Fica aqui, e não na matéria, porque
+  /// o domínio de um assunto varia dentro da mesma prova: quem já sabe o
+  /// primeiro capítulo e trava no terceiro precisa de intensidades
+  /// diferentes para cada um.
+  depth StudyDepth @default(INTERMEDIATE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
