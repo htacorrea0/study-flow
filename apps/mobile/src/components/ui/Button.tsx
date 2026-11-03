@@ -5,8 +5,11 @@ import { colors, radii, sizes, typography } from '@/theme';
 type ButtonProps = {
   label: string;
   onPress: () => void;
-  /** `primary`: fundo índigo. `secondary`: fundo branco com borda. */
-  variant?: 'primary' | 'secondary';
+  /**
+   * `primary`: fundo índigo. `secondary`: fundo branco com borda.
+   * `danger`: fundo vermelho, para a ação que destrói dado.
+   */
+  variant?: 'primary' | 'secondary' | 'danger';
   loading?: boolean;
   disabled?: boolean;
 };
@@ -16,6 +19,9 @@ type ButtonProps = {
  *
  * Primário: `#4f46e5`, altura 52, raio 12, Outfit Bold 16 em branco.
  * Secundário: a mesma caixa dos `social-btn`, altura 48 e borda `border`.
+ * Destrutivo: a caixa do primário em `danger`. Não vem do Figma, que não tem
+ * nenhuma tela de exclusão; é a cor que o app já usa para erro, aplicada ao
+ * único lugar onde um toque apaga algo sem volta.
  *
  * Enquanto `loading`, o rótulo some, entra o indicador e o toque fica
  * bloqueado. É o que impede o envio em duplicata de um formulário.
@@ -27,7 +33,7 @@ export function Button({
   loading = false,
   disabled = false,
 }: ButtonProps) {
-  const isPrimary = variant === 'primary';
+  const isSecondary = variant === 'secondary';
   const isBlocked = disabled || loading;
 
   return (
@@ -39,15 +45,17 @@ export function Button({
       accessibilityState={{ disabled: isBlocked, busy: loading }}
       style={({ pressed }) => [
         styles.base,
-        isPrimary ? styles.primary : styles.secondary,
+        isSecondary ? styles.secondary : styles.preenchido,
+        variant === 'danger' ? styles.danger : null,
+        variant === 'primary' ? styles.primary : null,
         pressed && !isBlocked ? styles.pressed : null,
         isBlocked ? styles.blocked : null,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? colors.white : colors.primary} />
+        <ActivityIndicator color={isSecondary ? colors.primary : colors.white} />
       ) : (
-        <Text style={[styles.label, isPrimary ? styles.labelPrimary : styles.labelSecondary]}>
+        <Text style={[styles.label, isSecondary ? styles.labelSecondary : styles.labelPrimary]}>
           {label}
         </Text>
       )}
@@ -61,9 +69,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radii.control,
   },
-  primary: {
+  preenchido: {
     height: sizes.controlHeight,
+  },
+  primary: {
     backgroundColor: colors.primary,
+  },
+  danger: {
+    backgroundColor: colors.danger,
   },
   secondary: {
     height: sizes.secondaryButtonHeight,

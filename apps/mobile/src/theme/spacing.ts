@@ -24,6 +24,13 @@ export const sizes = {
   /** Lado do quadrado do ícone dentro de um input. */
   inputIcon: 20,
   /**
+   * Lado do quadrado do checkbox.
+   *
+   * Abaixo do alvo mínimo de toque: quem desenha a linha do checkbox
+   * compensa com `hitSlop`, como o olho da senha já faz.
+   */
+  checkbox: 24,
+  /**
    * Alvo mínimo de toque.
    *
    * Não vem do Figma: é o mínimo recomendado pelas diretrizes de

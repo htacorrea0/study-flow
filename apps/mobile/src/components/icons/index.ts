@@ -1,5 +1,6 @@
 export { type IconProps } from './createIcon';
 
+export { AlertTriangleIcon } from './AlertTriangleIcon';
 export { ArrowRightIcon } from './ArrowRightIcon';
 export { BarChartIcon } from './BarChartIcon';
 export { BookOpenIcon } from './BookOpenIcon';
@@ -18,6 +19,10 @@ export { HomeIcon } from './HomeIcon';
 export { LockIcon } from './LockIcon';
 export { MailIcon } from './MailIcon';
 export { MapIcon } from './MapIcon';
+export { PencilIcon } from './PencilIcon';
 export { PlayIcon } from './PlayIcon';
+export { PlusIcon } from './PlusIcon';
+export { Trash2Icon } from './Trash2Icon';
 export { UserIcon } from './UserIcon';
+export { XIcon } from './XIcon';
 export { ZapIcon } from './ZapIcon';
