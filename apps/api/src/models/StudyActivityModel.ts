@@ -1,5 +1,6 @@
-import { prisma } from '../config/prisma';
-import type { Prisma } from '../generated/prisma/client';
+import { clientOrTransaction, prisma } from '../config/prisma';
+import type { TransactionClient } from '../config/prisma';
+import type { ActivityStatus, Prisma } from '../generated/prisma/client';
 
 /**
  * Seleção que a interface precisa para desenhar um item de sessão.
@@ -17,6 +18,7 @@ const SELECAO_COM_CONTEXTO = {
   position: true,
   content: {
     select: {
+      title: true,
       assessment: {
         select: {
           title: true,
@@ -115,4 +117,111 @@ export async function findMarksInRangeForUser(
     scheduledDate: atividade.scheduledDate,
     color: atividade.content.assessment.subject.color,
   }));
+}
+
+/**
+ * Todas as atividades de um plano, com o que o recálculo precisa para
+ * recriá-las na versão nova: conteúdo, avaliação, data, posição e status.
+ */
+const SELECAO_PARA_COPIA = {
+  id: true,
+  contentId: true,
+  title: true,
+  scheduledDate: true,
+  estimatedMinutes: true,
+  position: true,
+  status: true,
+  manuallyEdited: true,
+  content: { select: { assessmentId: true } },
+} satisfies Prisma.StudyActivitySelect;
+
+export type ActivityForCopy = Prisma.StudyActivityGetPayload<{ select: typeof SELECAO_PARA_COPIA }>;
+
+export async function findAllByPlanForUser(
+  userId: string,
+  planId: string,
+  tx?: TransactionClient,
+): Promise<readonly ActivityForCopy[]> {
+  return clientOrTransaction(tx).studyActivity.findMany({
+    where: doPlanoDoUsuario(userId, planId),
+    select: SELECAO_PARA_COPIA,
+    orderBy: [{ scheduledDate: 'asc' }, { position: 'asc' }],
+  });
+}
+
+export interface ActivityCreateInput {
+  readonly contentId: string;
+  readonly title: string;
+  readonly scheduledDate: Date;
+  readonly estimatedMinutes: number;
+  readonly position: number;
+  readonly status?: ActivityStatus;
+  readonly manuallyEdited?: boolean;
+}
+
+/** Grava de uma vez as atividades de um plano recém-criado. */
+export async function createMany(
+  planId: string,
+  atividades: readonly ActivityCreateInput[],
+  tx?: TransactionClient,
+): Promise<number> {
+  if (atividades.length === 0) {
+    return 0;
+  }
+  const resultado = await clientOrTransaction(tx).studyActivity.createMany({
+    data: atividades.map((atividade) => ({ planId, ...atividade })),
+  });
+  return resultado.count;
+}
+
+/** Atividade com o contexto que a confirmação do dia precisa conferir. */
+const SELECAO_PARA_CONFIRMACAO = {
+  id: true,
+  planId: true,
+  contentId: true,
+  scheduledDate: true,
+  estimatedMinutes: true,
+  status: true,
+  content: { select: { assessmentId: true } },
+} satisfies Prisma.StudyActivitySelect;
+
+export type ActivityForConfirmation = Prisma.StudyActivityGetPayload<{
+  select: typeof SELECAO_PARA_CONFIRMACAO;
+}>;
+
+/**
+ * Atividades por identificador, já filtradas pelo dono.
+ *
+ * O filtro é `plan: { userId }` e não `planId`: quem chama manda uma lista de
+ * identificadores vinda do aparelho, e a lista precisa ser podada pelo dono
+ * antes de qualquer conferência.
+ */
+export async function findByIdsForUser(
+  userId: string,
+  ids: readonly string[],
+): Promise<readonly ActivityForConfirmation[]> {
+  if (ids.length === 0) {
+    return [];
+  }
+  return prisma.studyActivity.findMany({
+    where: { id: { in: [...ids] }, plan: { userId } },
+    select: SELECAO_PARA_CONFIRMACAO,
+  });
+}
+
+/** Marca o status de várias atividades de uma vez. */
+export async function updateStatus(
+  userId: string,
+  ids: readonly string[],
+  status: ActivityStatus,
+  tx?: TransactionClient,
+): Promise<number> {
+  if (ids.length === 0) {
+    return 0;
+  }
+  const atingidos = await clientOrTransaction(tx).studyActivity.updateMany({
+    where: { id: { in: [...ids] }, plan: { userId } },
+    data: { status },
+  });
+  return atingidos.count;
 }

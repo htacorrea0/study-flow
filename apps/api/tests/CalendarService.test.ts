@@ -162,7 +162,7 @@ describe('CalendarService.getMonth', () => {
     expect(res.days).toEqual([{ date: '2026-10-05', colors: ['#10b981', '#f59e0b'], assessments: [] }]);
   });
 
-  it('ignora matéria sem cor escolhida, porque não há ponto para desenhar', async () => {
+  it('marca o dia da matéria sem cor escolhida, com a cor em branco', async () => {
     findMarksInRangeForUser.mockResolvedValue([
       mark('2026-10-05', null),
       mark('2026-10-06', '#10b981'),
@@ -170,7 +170,10 @@ describe('CalendarService.getMonth', () => {
 
     const res = await calendarService.getMonth(USER_ID, '2026-10', AGORA);
 
-    expect(res.days).toEqual([{ date: '2026-10-06', colors: ['#10b981'], assessments: [] }]);
+    expect(res.days).toEqual([
+      { date: '2026-10-05', colors: [null], assessments: [] },
+      { date: '2026-10-06', colors: ['#10b981'], assessments: [] },
+    ]);
   });
 
   it('devolve o mês vazio quando não há atividade nenhuma', async () => {
@@ -285,12 +288,13 @@ describe('CalendarService.getDay', () => {
     findByDateForUser.mockResolvedValue([
       {
         id: '33333333-3333-4333-8333-333333333333',
-        title: 'Lista de exercícios',
+        title: 'Estudar lista de exercícios',
         scheduledDate: new Date('2026-10-20T00:00:00.000Z'),
         estimatedMinutes: 60,
         status: 'IN_PROGRESS',
         position: 0,
         content: {
+          title: 'Lista de exercícios',
           assessment: {
             title: 'Trabalho final',
             type: 'ASSIGNMENT',
@@ -306,7 +310,7 @@ describe('CalendarService.getDay', () => {
     expect(res.sessions).toEqual([
       {
         activityId: '33333333-3333-4333-8333-333333333333',
-        title: 'Lista de exercícios',
+        title: 'Estudar lista de exercícios',
         subject: { name: 'Cálculo', color: '#f59e0b' },
         assessmentTitle: 'Trabalho final',
         assessmentType: 'ASSIGNMENT',

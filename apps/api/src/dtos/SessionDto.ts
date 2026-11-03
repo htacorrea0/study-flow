@@ -1,5 +1,6 @@
 import type { SessionItem } from '@study-flow/shared';
 
+import { tituloComNomeAtual } from '../domain/planning/activityTitle';
 import type { ActivityWithContext } from '../models/StudyActivityModel';
 import {
   daysBetween,
@@ -25,7 +26,7 @@ export function toSessionItem(
 
   return {
     activityId: activity.id,
-    title: activity.title,
+    title: tituloComNomeAtual(activity.title, activity.content.title),
     subject: {
       name: assessment.subject.name,
       color: assessment.subject.color,

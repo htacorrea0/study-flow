@@ -29,7 +29,7 @@ function toCalendarAssessment(assessment: AssessmentWithSubject): CalendarAssess
 
 /** O que a grade sabe sobre um dia, enquanto está sendo montado. */
 interface DiaEmConstrucao {
-  colors: string[];
+  colors: (string | null)[];
   assessments: CalendarAssessment[];
 }
 
@@ -65,8 +65,6 @@ export function toCalendarMonthResponse(
   const porDia = new Map<IsoDate, DiaEmConstrucao>();
 
   for (const mark of marks) {
-    if (mark.color === null) continue;
-
     const dia = diaDe(porDia, fromDateColumn(mark.scheduledDate));
 
     if (dia.colors.length < MAXIMO_DE_PONTOS && !dia.colors.includes(mark.color)) {

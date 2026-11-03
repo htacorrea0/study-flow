@@ -81,6 +81,7 @@ function activity(overrides: Partial<ActivityWithContext> = {}): ActivityWithCon
     status: 'PLANNED',
     position: 0,
     content: {
+      title: 'Thévenin',
       assessment: {
         title: 'Prova 2',
         type: 'EXAM',
@@ -213,7 +214,7 @@ describe('DashboardService.getDashboard', () => {
     expect(res.upcomingSessions).toEqual([
       {
         activityId: '33333333-3333-4333-8333-333333333333',
-        title: 'Revisar Thévenin',
+        title: 'Revisar thévenin',
         subject: { name: 'Circuitos', color: '#10b981' },
         assessmentTitle: 'Prova 2',
         assessmentType: 'EXAM',
