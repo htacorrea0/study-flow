@@ -1,6 +1,6 @@
 import type { DashboardResponse } from '@study-flow/shared';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 
 import { ApiError } from '@/services/api';
 import { fetchDashboard } from '@/services/dashboard/DashboardService';
@@ -31,13 +31,18 @@ export function useDashboardController(): DashboardController {
   const [status, setStatus] = useState<DashboardStatus>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const load = useCallback(async (): Promise<void> => {
-    setStatus('loading');
+  const jaCarregou = useRef(false);
+
+  const load = useCallback(async (comEsqueleto: boolean): Promise<void> => {
+    if (comEsqueleto) {
+      setStatus('loading');
+    }
     setErrorMessage(null);
 
     try {
       setData(await fetchDashboard());
       setStatus('ready');
+      jaCarregou.current = true;
     } catch (error) {
       setErrorMessage(
         error instanceof ApiError ? error.message : 'Não foi possível carregar seu dia.',
@@ -46,15 +51,20 @@ export function useDashboardController(): DashboardController {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Recarrega sempre que a aba volta ao foco: cadastrar uma matéria ou
+  // confirmar um dia muda a meta e a sequência, e a aba Início fica montada
+  // o tempo todo. O esqueleto só aparece na primeira carga.
+  useFocusEffect(
+    useCallback(() => {
+      void load(!jaCarregou.current);
+    }, [load]),
+  );
 
   return {
     status,
     data,
     errorMessage,
-    reload: () => void load(),
+    reload: () => void load(true),
     // "Ver todas" e "Iniciar sessão" apontam para abas, e não para telas
     // empilhadas: o Figma desenha os dois dentro da mesma navegação.
     goToCalendar: () => router.navigate('/calendario'),

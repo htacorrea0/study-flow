@@ -14,7 +14,7 @@ type MonthGridProps = {
   readonly onSelect: (date: IsoDate) => void;
 };
 
-const SEM_PONTOS: readonly string[] = [];
+const SEM_PONTOS: readonly (string | null)[] = [];
 const SEM_PRAZOS: readonly CalendarAssessment[] = [];
 const LETRAS = weekdayLetters();
 

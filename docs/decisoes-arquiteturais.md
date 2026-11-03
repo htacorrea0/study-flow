@@ -167,11 +167,14 @@ alterou um, altera o outro.
 
 ## 6. O algoritmo de planejamento é uma porta, não uma implementação
 
-`src/domain/planning/` contém só:
+`src/domain/planning/` tem:
 
 - `types.ts` — `PlanningInput`, `PlanningOutput`, `PlannedActivity`,
   `PlanningConflict`.
 - `StudyPlanner.ts` — a interface `{ version, plan(input): output }`.
+- `deadlineFirstPlanner.ts` — a primeira implementação dessa interface
+  (seção 13). A porta veio antes, e continua valendo: trocar a heurística é
+  trocar esse arquivo, sem tocar em service, rota ou tela.
 
 Três propriedades estão fixadas pela forma da interface:
 
@@ -540,6 +543,13 @@ duas sessões da mesma matéria, a cor repetida é descartada em vez de ocupar o
 segundo ponto: dois pontos idênticos não informam nada, e gastariam o único
 espaço que mostraria a segunda matéria do dia.
 
+Matéria sem cor escolhida também ganha ponto. Antes do cadastro existir, toda
+matéria vinha do seed e tinha cor, e o servidor descartava a cor nula ao montar
+a grade. Com o cadastro, escolher cor virou opcional, e o descarte apagava o
+dia inteiro: um dia com estudo marcado ficava igual a um dia vazio. Agora o
+`null` viaja na lista de cores e a interface desenha o ponto em índigo, que é o
+mesmo que ela já faz na agenda do dia e no anel do prazo.
+
 ### 12.8 Sair da conta mora provisoriamente no Progresso
 
 O botão de sair vivia na tela placeholder que o dashboard substituiu. Ele foi
@@ -584,3 +594,163 @@ compromisso do dia e precisa pesar mais do que um estudo que pode ser
 remarcado. A frase "Nenhuma sessão de estudo marcada para este dia" continua
 aparecendo embaixo de um prazo sem sessão, porque "a prova é hoje e não há
 nada marcado" é exatamente o que vale a pena saber.
+
+---
+
+## 13. Distribuição, recálculo e confirmação do dia
+
+### A heurística do `deadline-first-v1`
+
+`domain/planning/deadlineFirstPlanner.ts` é a primeira implementação de
+`StudyPlanner`. Em ordem: descarta o que já foi concluído, agrupa os
+conteúdos por avaliação, processa as avaliações pelo prazo mais próximo e,
+dentro de cada uma, os conteúdos por prioridade e depois por esforço.
+
+Duas escolhas merecem registro.
+
+**O dia escolhido é o mais vazio, não o mais próximo.** Encher hoje até o
+limite e só então passar para amanhã produziria um plano tecnicamente válido
+e humanamente ruim: a pessoa estuda cinco horas na segunda e nada na quinta.
+Espalhar pelos dias com mais minutos livres distribui a carga e deixa folga
+para o imprevisto, que é o caso normal.
+
+**O conteúdo não é partido entre dois dias.** O conteúdo é a unidade de
+planejamento e o progresso é registrado contra ele: partir "Derivadas" em
+dois dias criaria duas atividades com um progresso só, e marcar uma delas
+como feita deixaria o banco sem resposta para "esse conteúdo está estudado?".
+Um conteúdo grande demais para um dia é um conteúdo mal cadastrado, e a
+pessoa resolve isso dividindo em dois, onde o app não precisa adivinhar.
+
+**"Encaixa e avisa" em vez de deixar conteúdo sem data.** Quando nada mais
+cabe, o conteúdo entra no dia mais vazio assim mesmo e o excedente vira um
+conflito `INSUFFICIENT_TIME` com o déficit em minutos. A alternativa seria
+devolver o conteúdo em `unscheduledContentIds`, o que na tela vira um
+conteúdo que simplesmente não aparece em dia nenhum. Estourar o tempo é um
+fato que a pessoa precisa ver; sumir não é.
+
+### Por que o recálculo é escopado na avaliação
+
+Marcar "não estudei" recalcula **só as sessões da avaliação afetada**. As
+outras matérias são copiadas para o plano novo nas mesmas datas, posições e
+status, e a capacidade de cada dia chega ao planner já descontada do que
+essas cópias ocupam.
+
+O motivo é de confiança, não de desempenho: quem deixou de estudar Cálculo na
+terça não espera encontrar História remarcada na quinta. Um replanejamento
+global a cada toque faria a grade inteira se mexer por um motivo que a pessoa
+não consegue relacionar com o que acabou de fazer, e um calendário que muda
+sozinho deixa de ser consultado.
+
+Mudar a disponibilidade é a exceção: ela muda o chão de todas as avaliações
+ao mesmo tempo, e aí o recálculo é `{ kind: 'all' }`.
+
+Recalcular nunca sobrescreve. Cria um `StudyPlan` novo `ACTIVE` e marca o
+anterior como `SUPERSEDED`, na mesma transação, como o `schema.prisma` já
+previa.
+
+### `recordedAt` é o dia confirmado, não o instante da confirmação
+
+Confirmar uma segunda-feira na quarta grava o progresso **na segunda**. Se
+gravasse em "agora", recuperar três dias esquecidos de uma vez inflaria a
+meta de hoje para 300% e inventaria uma sequência que não houve. A data
+confirmada é a verdade sobre quando o estudo aconteceu; o instante do toque é
+só quando a pessoa lembrou de registrar.
+
+Pela mesma razão, dia futuro não pode ser confirmado: não há o que registrar
+sobre um dia que não aconteceu.
+
+### Reconfirmar não duplica
+
+A confirmação apaga os `StudyProgress` daquelas atividades antes de gravar os
+novos. Quem marca errado e corrige em seguida tem um registro por atividade,
+não dois: o dia confirmado é um retrato do dia, e um retrato substitui o
+anterior.
+
+### O painel manda o dia inteiro numa requisição só
+
+A tela acumula as marcações e envia tudo ao tocar em "Confirmar dia". Mandar
+uma sessão por vez remontaria o calendário a cada toque, movendo as sessões
+debaixo do dedo de quem ainda está marcando.
+
+
+### Profundidade de estudo = número de passadas, não dia mais longo
+
+O conteúdo tem um campo `depth` (`BASIC`, `INTERMEDIATE`, `INTENSE`), e ele
+vira a quantidade de vezes que aquele conteúdo é agendado: uma, duas ou três
+passadas, cada uma num dia diferente. Não é um multiplicador de minutos.
+
+O pedido era "mais dias de estudo" para quem quer intenso, e esticar a sessão
+de 60 para 180 minutos não dá mais dias: dá um dia pesado. Repetir o conteúdo
+em dias diferentes também é o que faz diferença para lembrar na prova, que é
+o que "estudo intenso" quer dizer na prática.
+
+A primeira passada custa o esforço estimado do conteúdo; as seguintes custam
+metade (`PESO_DA_REVISAO = 0.5`, mínimo de um minuto). Revisar é mais barato
+do que ver pela primeira vez, e sem esse desconto o modo intenso triplicaria
+a carga e encheria o plano de `INSUFFICIENT_TIME` — o aviso perderia sentido
+por aparecer sempre.
+
+Quando há menos dias livres do que passadas, a mesma data se repete: é a
+mesma decisão de "encaixa e avisa" já tomada para o tempo livre. Melhor duas
+passadas no mesmo dia do que uma passada perdida.
+
+### O progresso conta passadas, e por isso é ancorado no conteúdo
+
+O planner recebe `completedPassesByContentId`, não mais uma lista de
+conteúdos concluídos: quem já estudou uma vez e ainda deve duas revisões
+precisa voltar ao calendário apenas com o que falta. A contagem sai de um
+`groupBy` nos `StudyProgress` com status `DONE` por `contentId` — possível
+porque o progresso é gravado contra o conteúdo (não contra a atividade) e
+reconfirmar um dia substitui o registro daquela data em vez de empilhar um
+segundo.
+
+### A profundidade é do conteúdo, não da matéria
+
+Começou na matéria e mudou de lugar: numa mesma prova, um assunto já é
+dominado e pede uma passada enquanto outro trava e pede três. Profundidade
+por matéria força o mesmo tratamento para todos os assuntos dela, e aí quem
+quer intenso em um capítulo paga três passadas em todos.
+
+A migração `20261103010000_profundidade_por_conteudo` copia para cada
+conteúdo o valor que estava na matéria dele antes de derrubar a coluna, para
+que nenhum plano já montado mude de forma sozinho.
+
+Como todo mutador de conteúdo já termina em
+`PlanService.recalculate({ kind: 'assessment' })`, mudar a profundidade
+recalcula só aquela avaliação, sem nenhum caminho novo: a regra de que mexer
+numa prova não embaralha as outras continua valendo. O `PATCH /subjects/:id`
+voltou a devolver a matéria pura (`SubjectResponse`), porque nome e cor não
+mexem no plano e não há aviso para dar.
+
+### Apagar: a avaliação leva o que é dela, a matéria não leva nada
+
+`DELETE /assessments/:id` apaga conteúdos e sessões junto, por cascade, e
+**não** recalcula: os dias que vagaram ficam vagos, e puxar o estudo das
+outras matérias para o buraco seria uma surpresa para quem só quis tirar uma
+prova da lista. `DELETE /subjects/:id` encosta no `onDelete: Restrict` do
+schema e devolve 409 com a razão ("Esta matéria ainda tem provas ou
+trabalhos...") enquanto houver avaliação: apagar uma matéria é barato de
+pedir e caro de desfazer, e o histórico de estudo mora nas avaliações. Nas
+duas telas o toque passa por um `ConfirmDialog` que diz o que sai junto.
+
+### O título da sessão é derivado na leitura, não confiado ao que foi gravado
+
+`StudyActivity.title` é uma cópia do nome do conteúdo feita no instante em que
+o plano foi calculado. Isso é útil para quem lê o banco direto, mas envelhece:
+renomear um conteúdo não reescreve as atividades já gravadas, e o recálculo
+copia as atividades passadas literalmente (é o que preserva o histórico). O
+resultado era um calendário com o nome antigo nos dias que já passaram e o
+novo nos dias à frente — a mesma matéria aparecendo com dois nomes.
+
+A correção não foi reescrever o campo a cada renomeação, que exigiria varrer
+todos os planos aposentados e ainda assim perderia qualquer atividade criada
+antes. `SessionDto` passou a montar o título a partir do nome que o conteúdo
+tem **agora** (`StudyActivityModel.SELECAO_COM_CONTEXTO` já traz
+`content.title`), preservando apenas o verbo que o planner escolheu:
+`activityTitle.tituloComNomeAtual` lê "Estudar" ou "Revisar" do título gravado
+e troca o resto. Uma fonte de verdade só, a do conteúdo; o campo gravado vira
+registro histórico, não origem do que a tela mostra.
+
+`activityTitle.tituloDaPassada`, usada pelo planner na escrita, e
+`tituloComNomeAtual`, usada na leitura, ficam no mesmo arquivo justamente para
+que as duas frases nunca divirjam.

@@ -118,6 +118,7 @@ enxerga. As chaves de `fontFamilies` são exatamente os nomes registrados no
 | `sizes.secondaryButtonHeight` | 48 | Botão secundário |
 | `sizes.inputIcon` | 20 | Caixa do ícone dentro do input (glifo de 18) |
 | `sizes.minTouchTarget` | 44 | **Não é do Figma.** Mínimo de acessibilidade, usado no `hitSlop` do olho de senha |
+| `sizes.checkbox` | 24 | Quadrado do `Checkbox`. **Não é do Figma**: nenhuma tela do arquivo tem caixa de marcação |
 
 Gaps recorrentes do formulário: 20 entre grupos de campo, 8 entre label e
 input, 12 entre o ícone e o texto dentro do input.
@@ -134,6 +135,7 @@ ao padding da página no arquivo inteiro.
 | `cardLarge` | 24 | Card da meta do dia e card do calendário |
 | `ring` | 14 | Círculo do número do dia na grade (28 de lado) |
 | `pill` | 100 | Badge, barra de progresso |
+| `checkbox` | 6 | Quadrado do `Checkbox`, menor que `control` para o quadrado não virar bolinha |
 
 ---
 
@@ -167,17 +169,39 @@ apps/mobile/src/components/
 │   ├── InlineLink.tsx        texto com um trecho clicável (padrão do rodapé do login)
 │   ├── Card.tsx              superfície branca com borda, raio 16 ou 24
 │   ├── Avatar.tsx            iniciais do nome num círculo de 48
-│   └── ProgressRing.tsx      anel de 80 em SVG, trilho + arco + percentual
+│   ├── ProgressRing.tsx      anel de 80 em SVG, trilho + arco + percentual
+│   ├── Checkbox.tsx          quadrado de 24 com CheckIcon, três estados (vazio, parcial, marcado)
+│   ├── ListRow.tsx           linha pressionável: ponto de cor, título, apoio, chevron
+│   ├── Segmented.tsx         opções lado a lado (Prova / Trabalho, profundidade)
+│   ├── DateField.tsx         TextField com máscara DD/MM/AAAA, sem dependência nova
+│   ├── ColorPicker.tsx       fileira das cores do tema, mais a opção sem cor
+│   ├── ConfirmDialog.tsx     Modal do React Native com confirmar e cancelar
+│   └── Banner.tsx            aviso de conflito, fundo roseSoft ou amber, com AlertTriangleIcon
 ├── navigation/
 │   └── BottomTabBar.tsx      barra de abas das Tabs do Expo Router
 └── icons/                    SVG do Figma renderizado por react-native-svg
-    ├── 21 ícones do Lucide
+    ├── 26 ícones do Lucide
     └── createIcon.tsx        fábrica: injeta tamanho e cor; viewBox 18 por padrão, 24 opcional
 ```
 
 O formulário do login é o **único padrão de entrada de dados do arquivo
 inteiro**. Por isso ele virou componente logo na primeira etapa, em vez de
 código de tela: as próximas telas reusam sem redesenhar nada.
+
+Os sete componentes do bloco de cadastro (do `Checkbox` ao `Banner`) não
+estão desenhados no Figma: o arquivo não tem tela de cadastro. Eles são
+montados com os tokens que já existem, para que a tela nova pareça a mesma
+coisa que as telas desenhadas. `Button` ganhou a variante `danger`, em
+`colors.danger`, usada só no botão de apagar do `ConfirmDialog`.
+
+`ConfirmDialog` usa o `Modal` do React Native, e não o `Alert`: o `Alert` não
+existe na web, e o projeto roda no navegador durante o desenvolvimento.
+
+Template compartilhado novo: `views/_templates/_screenTopBar.tsx` (voltar de
+40 × 40, título e ação à direita), com a mesma geometria que
+`views/calendar/_calendarHeader.tsx` já desenhava. Como `headerShown: false`
+vale no app inteiro, cada tela empilhada desenha o próprio cabeçalho, e sem
+esse template cada uma reinventaria o alinhamento.
 
 ### 4.1 Os ícones
 
@@ -204,6 +228,12 @@ Os dezesseis ícones que o dashboard e o calendário trouxeram (`flame`, `play`,
 `check`, `flag`) são traçados do Lucide na grade nativa de 24. Para isso, `createIcon` ganhou um
 terceiro parâmetro opcional `viewBox`, com `'0 0 18 18'` como padrão: os cinco
 ícones do login continuam idênticos e os novos entram sem reescalar à mão.
+
+As telas de cadastro trouxeram mais cinco, também do Lucide na grade de 24
+(`plus`, `trash-2`, `pencil`, `x`, `alert-triangle`), fechando **26**. Esses
+cinco não estão desenhados em nenhum nó do Figma: o arquivo não tem tela de
+cadastro, e o conjunto já era Lucide, então pegar o traçado do Lucide é
+continuar a mesma família, não escolher outra.
 
 Se um ícone novo for preciso, o caminho é o mesmo: exportar o nó do Figma e
 passar o `d` para `createIcon`. Trocar por uma fonte de ícones

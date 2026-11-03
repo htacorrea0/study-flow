@@ -8,8 +8,9 @@ type DayCellProps = {
   readonly cell: Cell;
   readonly selected: boolean;
   readonly isToday: boolean;
-  /** Cores das matérias com sessão nesse dia, no máximo duas. */
-  readonly dots: readonly string[];
+  /** Cores das matérias com sessão nesse dia, no máximo duas. `null` é a
+   * matéria sem cor escolhida, que o ponto desenha em índigo. */
+  readonly dots: readonly (string | null)[];
   /** Provas e entregas cujo prazo cai nesse dia. */
   readonly assessments: readonly CalendarAssessment[];
   readonly onPress: (date: string) => void;
@@ -84,7 +85,7 @@ export function DayCell({ cell, selected, isToday, dots, assessments, onPress }:
 
       <View style={styles.pontos}>
         {visiveis.map((cor, indice) => (
-          <View key={`${cell.date}-${indice}`} style={[styles.ponto, { backgroundColor: cor }]} />
+          <View key={`${cell.date}-${indice}`} style={[styles.ponto, { backgroundColor: cor ?? colors.primary }]} />
         ))}
       </View>
     </Pressable>

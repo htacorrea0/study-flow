@@ -1,7 +1,10 @@
 import type { CalendarAssessment, CalendarDayMark, SessionItem } from '@study-flow/shared';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ApiError } from '@/services/api';
+import { fetchAvailability } from '@/services/availability/AvailabilityService';
 import { fetchDay, fetchMonth } from '@/services/calendar/CalendarService';
 import {
   addMonths,
@@ -30,6 +33,14 @@ export type CalendarController = {
   readonly daySessions: readonly SessionItem[];
   /** Prazos que vencem no dia selecionado. */
   readonly dayAssessments: readonly CalendarAssessment[];
+  /**
+   * A pessoa ainda não disse quanto tempo tem por dia.
+   *
+   * Enquanto é `true`, nenhuma sessão pode ser distribuída, e a grade vazia
+   * sozinha não explica o motivo. `null` enquanto a resposta não chega.
+   */
+  readonly needsAvailability: boolean | null;
+  readonly goToAvailability: () => void;
   readonly goToPreviousMonth: () => void;
   readonly goToNextMonth: () => void;
   readonly goToToday: () => void;
@@ -57,6 +68,7 @@ function indexarMarcacoes(days: readonly CalendarDayMark[]): Map<IsoDate, Calend
  * servidor: desenhar outubro não precisa de rede.
  */
 export function useCalendarController(): CalendarController {
+  const router = useRouter();
   const [today] = useState<IsoDate>(() => todayIsoDate());
 
   const [month, setMonth] = useState<IsoMonth>(() => monthOf(today));
@@ -65,6 +77,8 @@ export function useCalendarController(): CalendarController {
   const [marksByDate, setMarksByDate] = useState<ReadonlyMap<IsoDate, CalendarDayMark>>(new Map());
   const [daySessions, setDaySessions] = useState<readonly SessionItem[]>([]);
   const [dayAssessments, setDayAssessments] = useState<readonly CalendarAssessment[]>([]);
+
+  const [needsAvailability, setNeedsAvailability] = useState<boolean | null>(null);
 
   const [monthStatus, setMonthStatus] = useState<CalendarStatus>('loading');
   const [dayStatus, setDayStatus] = useState<CalendarStatus>('loading');
@@ -101,9 +115,48 @@ export function useCalendarController(): CalendarController {
     void loadMonth(month);
   }, [loadMonth, month]);
 
+  // A disponibilidade é buscada uma vez, e a falha dela é engolida de
+  // propósito: o aviso é um apoio, e derrubar o calendário por causa dele
+  // seria pior do que não mostrá-lo.
+  useEffect(() => {
+    let ativo = true;
+
+    void fetchAvailability()
+      .then((resposta) => {
+        if (ativo) {
+          setNeedsAvailability(resposta.days.every((day) => day.minutes === 0));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
   useEffect(() => {
     void loadDay(selectedDate);
   }, [loadDay, selectedDate]);
+
+  // Cadastrar uma prova em outra aba muda a grade daqui. Como a aba fica
+  // montada enquanto o app está aberto, sem isto o calendário só mostraria o
+  // cadastro novo depois de fechar e abrir o app.
+  const primeiroFoco = useRef(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (primeiroFoco.current) {
+        primeiroFoco.current = false;
+        return;
+      }
+
+      void loadMonth(month);
+      void loadDay(selectedDate);
+      void fetchAvailability()
+        .then((resposta) => setNeedsAvailability(resposta.days.every((day) => day.minutes === 0)))
+        .catch(() => undefined);
+    }, [loadDay, loadMonth, month, selectedDate]),
+  );
 
   function irPara(alvo: IsoMonth): void {
     setErrorMessage(null);
@@ -122,6 +175,8 @@ export function useCalendarController(): CalendarController {
     errorMessage,
     daySessions,
     dayAssessments,
+    needsAvailability,
+    goToAvailability: () => router.push('/materias/disponibilidade'),
     goToPreviousMonth: () => irPara(addMonths(month, -1)),
     goToNextMonth: () => irPara(addMonths(month, 1)),
     goToToday: () => {

@@ -1,9 +1,14 @@
-import { ScreenContainer } from '@/components/ui';
+import { StyleSheet, View } from 'react-native';
+
+import { ListRow, ScreenContainer } from '@/components/ui';
 import { useCalendarController } from '@/controllers/calendar/CalendarController';
+import { AlertTriangleIcon } from '@/components/icons';
+import { spacing } from '@/theme';
 import { ErrorState } from '@/views/_templates/_errorState';
 import { dayLabel } from '@/utils/date';
 import { AgendaList } from './_agendaList';
 import { CalendarHeader } from './_calendarHeader';
+import { ConfirmationPanel } from './_confirmationPanel';
 import { MonthGrid } from './_monthGrid';
 import { MonthSelector } from './_monthSelector';
 
@@ -59,12 +64,45 @@ export default function Calendar() {
         onSelect={controller.selectDate}
       />
 
+      {controller.needsAvailability === true ? (
+        <View style={styles.aviso}>
+          <ListRow
+            title="Sem tempo de estudo definido"
+            subtitle="Diga quantos minutos você tem por dia para o app montar o seu plano."
+            icon={AlertTriangleIcon}
+            onPress={controller.goToAvailability}
+          />
+        </View>
+      ) : null}
+
       <AgendaList
         title={titulo}
         assessments={controller.dayAssessments}
         sessions={controller.daySessions}
         loading={controller.dayStatus === 'loading'}
       />
+
+      {controller.dayStatus === 'ready' ? (
+        <View style={styles.painel}>
+          <ConfirmationPanel
+            date={controller.selectedDate}
+            today={controller.today}
+            sessions={controller.daySessions}
+            onConfirmed={controller.reload}
+          />
+        </View>
+      ) : null}
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  aviso: {
+    paddingHorizontal: spacing.xxl,
+    paddingBottom: spacing.lg,
+  },
+  painel: {
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.lg,
+  },
+});

@@ -181,3 +181,47 @@ export function dayLabel(date: IsoDate): string {
     timeZone: 'UTC',
   }).format(new Date(Date.UTC(year, month - 1, day)));
 }
+
+/**
+ * Aplica a máscara `DD/MM/AAAA` ao que foi digitado.
+ *
+ * Mantém só os dígitos e insere as barras nas posições fixas, o que faz o
+ * campo aceitar colar "01012026" e apagar sem travar numa barra. Oito dígitos
+ * é o limite: o nono seria ano de cinco casas.
+ */
+export function maskBrDate(text: string): string {
+  const digitos = text.replace(/\D/g, '').slice(0, 8);
+
+  const dia = digitos.slice(0, 2);
+  const mes = digitos.slice(2, 4);
+  const ano = digitos.slice(4, 8);
+
+  return [dia, mes, ano].filter((parte) => parte.length > 0).join('/');
+}
+
+/**
+ * Converte `DD/MM/AAAA` em `AAAA-MM-DD`, ou `null` se a data não existir.
+ *
+ * A checagem de existência é a ida e volta pelo `Date.UTC`: 31/02 vira 03/03
+ * e deixa de bater com o que foi digitado, então é recusada. Um `regex`
+ * sozinho aceitaria.
+ */
+export function brDateToIso(text: string): IsoDate | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(text.trim());
+
+  if (match === null) {
+    return null;
+  }
+
+  const [, dia = '', mes = '', ano = ''] = match;
+  const data = new Date(Date.UTC(Number(ano), Number(mes) - 1, Number(dia)));
+  const iso = toIsoDate(data);
+
+  return iso === `${ano}-${mes}-${dia}` ? iso : null;
+}
+
+/** Converte `AAAA-MM-DD` em `DD/MM/AAAA`, para preencher o campo na edição. */
+export function isoToBrDate(date: IsoDate): string {
+  const [ano = '', mes = '', dia = ''] = date.split('-');
+  return `${dia}/${mes}/${ano}`;
+}

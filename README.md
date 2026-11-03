@@ -606,30 +606,59 @@ Nomes de arquivo e organização de pastas:
   da agenda daquele dia. Avaliação não depende de plano ativo: o anel aparece
   mesmo num mês sem sessão marcada.
 - Navegação por abas: Início, Matérias, Calendário, Timer e Progresso.
-  Matérias, Timer e Progresso ainda são telas em branco, e dizem isso.
+  Timer e Progresso ainda são telas em branco, e dizem isso.
 - **Seed** com dados fictícios (`npm run db:seed`): um usuário de
-  demonstração com matérias, avaliações, disponibilidade, um plano ativo e
-  progresso suficiente para uma sequência real.
+  demonstração com matérias, avaliações, disponibilidade e progresso
+  suficiente para uma sequência real. O plano não é mais escrito à mão: o
+  seed chama o mesmo `PlanService.recalculate` que a API usa.
+
+**Cadastro, distribuição e confirmação do dia:**
+
+- CRUD de **matérias** (`/subjects`), **avaliações** (`/assessments`),
+  **conteúdos** (`/assessments/:id/contents` e `/contents/:id`) e
+  **disponibilidade** (`/availability`), todas atrás do `authenticate` e
+  filtrando por dono. Apagar matéria com avaliação devolve 409 em vez de
+  arrastar dados junto.
+- **Algoritmo de distribuição** de verdade:
+  `domain/planning/deadlineFirstPlanner.ts`, versão `deadline-first-v1`.
+  Função pura: prazo mais apertado escolhe dia primeiro, cada conteúdo cai
+  inteiro no dia mais vazio da janela, e o que não cabe é encaixado com
+  aviso em vez de sumir.
+- **Confirmação do dia** (`POST /activities/confirmations`): a pessoa marca o
+  que estudou e o que não estudou, e o que ficou de fora é redistribuído nos
+  dias que ainda restam até o prazo daquela avaliação. Só hoje e dias
+  passados podem ser confirmados, e o progresso é lançado no dia confirmado,
+  não no instante do toque.
+- Telas de **matérias**, **avaliação com conteúdos** e **disponibilidade**,
+  mais o painel "O que você estudou?" dentro da agenda do dia, com o
+  "Marcar todas" de três estados.
+- **Profundidade de estudo** por conteúdo (básico, intermediário ou intenso):
+  decide em quantos dias diferentes aquele assunto é agendado, de uma a três
+  passadas, com a revisão custando metade do esforço da primeira passada. É
+  escolhida assunto a assunto dentro da prova, porque o domínio varia na
+  mesma matéria: o capítulo já sabido pede uma passada e o que trava pede
+  três. Mudar a profundidade de um conteúdo remonta o plano daquela avaliação
+  e avisa se o estudo não couber no tempo livre.
+- **Apagar** matéria e avaliação. A avaliação leva junto os conteúdos e as
+  sessões dela; a matéria só sai depois que as avaliações saem, e a recusa
+  vem com a razão em vez de um erro seco.
 
 ### O que ainda não existe
 
 **Interface**
-- Telas de matérias, avaliações, conteúdos, disponibilidade, cronômetro,
-  progresso e perfil. As três últimas abas abrem uma tela em branco.
-- Marcar uma atividade como concluída pela tela. Hoje o progresso só entra
-  pelo seed.
+- Cronômetro Pomodoro, tela de progresso e tela de perfil. Timer e Progresso
+  abrem uma tela em branco.
+- Tela para **exceções de disponibilidade** ("nesta terça só tenho 30
+  minutos"). O cálculo de capacidade já lê a tabela `AvailabilityException`;
+  o seed cria uma; nenhuma tela cria.
+- Arrastar uma atividade para outro dia. A redistribuição é automática; não
+  há edição manual da grade.
 - Recuperação de senha, onboarding e login com Google ou Apple.
 - Foto de perfil. O avatar mostra as iniciais do nome.
 
 **Backend**
-- CRUD de matérias, avaliações, conteúdos e disponibilidade. As três rotas de
-  leitura existem; nenhuma rota de escrita.
-- Algoritmo de distribuição do plano de estudos e as regras de
-  redistribuição. Existe a interface `StudyPlanner` e os tipos de entrada e
-  saída: nenhuma implementação, nem fictícia. O seed grava as atividades
-  direto, marcadas com `algorithmVersion: 'seed-v1'` para que isso fique
-  explícito no banco.
 - Notificações agendadas.
+- Materiais de apoio (`StudyResource`): a tabela existe, nenhuma rota a usa.
 - Revogação de sessão no servidor. Não há refresh token nem tabela de
   sessões; o logout apaga o token no aparelho. O motivo e a contrapartida
   estão em [`docs/decisoes-arquiteturais.md`](docs/decisoes-arquiteturais.md),
@@ -642,8 +671,8 @@ Nomes de arquivo e organização de pastas:
 
 **Testes**
 - O app mobile ainda não tem runner de testes. A aritmética do calendário
-  (`apps/mobile/src/utils/date.ts`) foi conferida à mão e continua sem teste
-  automatizado.
+  (`apps/mobile/src/utils/date.ts`) e as telas novas foram conferidas à mão;
+  o gate automatizado do workspace é o `tsc --noEmit`.
 
 ---
 
