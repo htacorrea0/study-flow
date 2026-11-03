@@ -15,7 +15,7 @@
  * fuso horário num cálculo que é sobre dias do calendário, não sobre instantes.
  */
 
-import type { AssessmentType } from '@study-flow/shared';
+import type { AssessmentType, StudyDepth } from '@study-flow/shared';
 
 /** Data civil no formato `YYYY-MM-DD`. */
 export type IsoDate = string;
@@ -40,6 +40,14 @@ export interface PlanningContent {
   readonly estimatedEffortMinutes: number | null;
   /** Peso relativo: quanto maior, mais cedo é alocado sob restrição de tempo. */
   readonly priority: number;
+  /**
+   * Profundidade escolhida para este conteúdo, em passadas.
+   *
+   * É por conteúdo e não por avaliação porque o domínio varia dentro da
+   * mesma prova: o capítulo que a pessoa já sabe pede uma passada, o que ela
+   * trava pede três.
+   */
+  readonly depth: StudyDepth;
 }
 
 /** Minutos disponíveis num dia específico, já resolvendo exceções. */
@@ -62,10 +70,14 @@ export interface PlanningInput {
   readonly contents: readonly PlanningContent[];
   readonly capacities: readonly DailyCapacity[];
   /**
-   * Conteúdos já concluídos, que NÃO devem ser redistribuídos.
-   * Vem do histórico de StudyProgress, que sobrevive aos recálculos.
+   * Quantas passadas de cada conteúdo a pessoa já concluiu.
+   *
+   * Vem do histórico de StudyProgress, que sobrevive aos recálculos. O
+   * algoritmo agenda só o que falta: conteúdo com todas as passadas feitas
+   * não volta para a fila, e conteúdo com uma de três feitas volta com duas.
+   * Conteúdo ausente do mapa conta como zero.
    */
-  readonly completedContentIds: readonly string[];
+  readonly completedPassesByContentId: Readonly<Record<string, number>>;
 }
 
 /** Uma atividade concreta alocada num dia. */

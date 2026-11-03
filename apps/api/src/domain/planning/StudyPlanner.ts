@@ -17,7 +17,7 @@ import type { PlanningInput, PlanningOutput } from './types';
  *
  * O recálculo não é um método à parte: recalcular é chamar `plan` de novo com
  * a disponibilidade atualizada e os conteúdos já concluídos marcados em
- * `completedContentIds`.
+ * `completedPassesByContentId`.
  *
  * Implementação prevista para a Etapa 3, em
  * `src/domain/planning/<nome>Planner.ts`, registrada no serviço de
