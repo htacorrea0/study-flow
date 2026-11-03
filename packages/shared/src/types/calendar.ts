@@ -31,6 +31,11 @@ export interface CalendarAssessment {
  * dois pontos por dia, mas o corte é decisão da interface: o servidor devolve
  * o que existe.
  *
+ * `null` é a matéria que não escolheu cor, e entra na lista como qualquer
+ * outra. Deixar a matéria sem cor de fora apagaria o ponto do dia inteiro, e
+ * um dia com estudo marcado ficaria igual a um dia vazio. Qual cor desenhar
+ * no lugar do `null` é decisão da interface, como no resto do app.
+ *
  * `assessments` traz as avaliações com prazo naquele dia. A lista vem inteira
  * porque o dia do prazo é informação demais para caber num booleano: a grade
  * precisa da cor da matéria para desenhar a marca, e o leitor de tela precisa
@@ -39,7 +44,7 @@ export interface CalendarAssessment {
 export interface CalendarDayMark {
   /** Data civil, `AAAA-MM-DD`. */
   readonly date: string;
-  readonly colors: readonly string[];
+  readonly colors: readonly (string | null)[];
   readonly assessments: readonly CalendarAssessment[];
 }
 

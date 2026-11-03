@@ -15,6 +15,29 @@ export const ASSESSMENT_TYPES = ['EXAM', 'ASSIGNMENT'] as const;
 export type AssessmentType = (typeof ASSESSMENT_TYPES)[number];
 
 /**
+ * Quanto a pessoa quer se aprofundar num conteúdo.
+ *
+ * Não é um rótulo decorativo: é o número de passadas que o conteúdo ganha no
+ * plano. Básico estuda uma vez, intermediário estuda e revisa, intenso estuda
+ * e revisa duas vezes. Como cada passada cai num dia diferente, escolher
+ * intenso é literalmente pedir mais dias de estudo para aquele assunto.
+ *
+ * A escolha é por conteúdo, e não por matéria, porque o domínio varia dentro
+ * da mesma prova: quem já sabe o primeiro capítulo e trava no terceiro
+ * precisa de intensidades diferentes para cada um.
+ */
+export const STUDY_DEPTHS = ['BASIC', 'INTERMEDIATE', 'INTENSE'] as const;
+export type StudyDepth = (typeof STUDY_DEPTHS)[number];
+
+/**
+ * A profundidade de quem não escolheu.
+ *
+ * Intermediário porque é a opção que não surpreende: estudo mais uma
+ * revisão, e quem pensou no assunto muda em dois toques.
+ */
+export const DEFAULT_STUDY_DEPTH = 'INTERMEDIATE' as const;
+
+/**
  * Situação de uma atividade de estudo planejada.
  *
  * `PLANNED` e `SKIPPED` são estados distintos por exigência do domínio: uma
