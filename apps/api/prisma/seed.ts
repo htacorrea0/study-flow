@@ -4,6 +4,7 @@ import { emailSchema, passwordSchema, PASSWORD_POLICY_HINT } from '@study-flow/s
 
 import { prisma } from '../src/config/prisma';
 import { hashPassword } from '../src/security/password';
+import * as planService from '../src/services/PlanService';
 import {
   addDays,
   dayBoundsUtc,
@@ -15,10 +16,8 @@ import {
 /**
  * Dados de demonstração para as telas de início e calendário.
  *
- * Por que isto existe: as duas telas leem plano, atividades, disponibilidade e
- * progresso, e nada disso tem CRUD ainda. Em vez de a interface inventar dados
- * em memória, o banco recebe um conjunto fictício e o app lê do Postgres de
- * verdade, com o isolamento por usuário valendo desde o primeiro dia.
+ * Por que isto existe: dá para abrir o app com um histórico plausível sem
+ * precisar cadastrar quatro matérias à mão toda vez que o banco é recriado.
  *
  * Três regras que este arquivo não quebra:
  *
@@ -29,32 +28,26 @@ import {
  * 3. O escopo é um usuário só. Toda limpeza é filtrada por `userId`: rodar o
  *    seed nunca apaga dado de outra conta do mesmo banco.
  *
- * As atividades são gravadas direto, sem passar por algoritmo de distribuição,
- * porque ele ainda não existe. `algorithmVersion: 'seed-v1'` deixa isso
- * registrado no próprio banco, para que um plano de demonstração não seja
- * confundido com um plano calculado.
+ * As sessões futuras **não** são escritas à mão: o seed cadastra matérias,
+ * avaliações, conteúdos e disponibilidade e chama o mesmo
+ * `PlanService.recalculate` que o app chama, de modo que a demonstração
+ * mostre o que o algoritmo de verdade produz. Se a distribuição ficar
+ * estranha na tela, é porque ela está estranha no algoritmo, e isso é
+ * informação, não ruído do seed.
+ *
+ * O passado é a única parte escrita à mão, porque planejador nenhum produz
+ * passado: ele é histórico. Os conteúdos já estudados recebem o registro de
+ * progresso **antes** do recálculo, justamente para que o distribuidor os
+ * ignore em vez de reagendá-los.
  */
 
 const TIMEZONE = 'America/Sao_Paulo';
-const ALGORITHM_VERSION = 'seed-v1';
 
 /** Monta um instante a partir de uma data civil e uma hora local. */
 function atLocalHour(date: IsoDate, hour: number): Date {
   const { start } = dayBoundsUtc(date, TIMEZONE);
 
   return new Date(start.getTime() + hour * 60 * 60 * 1000);
-}
-
-/**
- * O que já passou conta como feito, o primeiro bloco de hoje está em
- * andamento e o resto está planejado. É o estado que a tela precisa para
- * mostrar as três aparências de um item de sessão.
- */
-function statusDaAtividade(dayOffset: number, position: number): 'DONE' | 'IN_PROGRESS' | 'PLANNED' {
-  if (dayOffset < 0) return 'DONE';
-  if (dayOffset === 0 && position === 0) return 'IN_PROGRESS';
-
-  return 'PLANNED';
 }
 
 function readCredentials(): { email: string; password: string } {
@@ -87,10 +80,20 @@ interface SeedContent {
   readonly minutes: number;
   readonly priority: number;
   /**
-   * Dia da sessão, contado a partir de hoje. Negativo é passado, e passado é
-   * gravado como concluído: o calendário precisa abrir com histórico visível.
+   * Profundidade deste assunto. Fica no conteudo, e nao na materia, porque o
+   * dominio varia dentro da mesma prova: o capitulo que a pessoa ja sabe pede
+   * uma passada e o que ela trava pede tres.
    */
-  readonly dayOffset: number;
+  readonly depth: 'BASIC' | 'INTERMEDIATE' | 'INTENSE';
+  /**
+   * Quantos dias atrás este conteúdo foi estudado. Ausente significa que
+   * ainda está pendente, e aí é o distribuidor que escolhe o dia dele.
+   *
+   * Os cinco valores usados abaixo são 4, 3, 2, 1 e 0, nesta ordem: cinco
+   * dias seguidos terminando hoje, que é o que faz a sequência da tela
+   * inicial abrir valendo 5.
+   */
+  readonly studiedDaysAgo?: number;
 }
 
 interface SeedSubject {
@@ -118,9 +121,9 @@ const MATERIAS: readonly SeedSubject[] = [
       title: 'Prova 2: análise de circuitos',
       dueInDays: 6,
       contents: [
-        { title: 'Teorema de Thévenin', minutes: 60, priority: 3, dayOffset: -5 },
-        { title: 'Teorema de Norton', minutes: 45, priority: 2, dayOffset: 0 },
-        { title: 'Análise nodal', minutes: 50, priority: 2, dayOffset: 4 },
+        { title: 'Teorema de Thévenin', minutes: 60, priority: 3, depth: 'INTENSE', studiedDaysAgo: 4 },
+        { title: 'Teorema de Norton', minutes: 45, priority: 2, depth: 'INTERMEDIATE', studiedDaysAgo: 1 },
+        { title: 'Análise nodal', minutes: 50, priority: 2, depth: 'INTENSE' },
       ],
     },
   },
@@ -132,8 +135,8 @@ const MATERIAS: readonly SeedSubject[] = [
       title: 'Lista 4: integrais de superfície',
       dueInDays: 3,
       contents: [
-        { title: 'Integrais de linha', minutes: 50, priority: 3, dayOffset: -3 },
-        { title: 'Teorema de Green', minutes: 40, priority: 2, dayOffset: 2 },
+        { title: 'Integrais de linha', minutes: 50, priority: 3, depth: 'INTERMEDIATE', studiedDaysAgo: 3 },
+        { title: 'Teorema de Green', minutes: 40, priority: 2, depth: 'BASIC' },
       ],
     },
   },
@@ -145,9 +148,9 @@ const MATERIAS: readonly SeedSubject[] = [
       title: 'Prova 1: árvores e grafos',
       dueInDays: 12,
       contents: [
-        { title: 'Árvores balanceadas', minutes: 60, priority: 3, dayOffset: -1 },
-        { title: 'Busca em largura e profundidade', minutes: 45, priority: 2, dayOffset: 2 },
-        { title: 'Caminho mínimo', minutes: 55, priority: 1, dayOffset: 8 },
+        { title: 'Árvores balanceadas', minutes: 60, priority: 3, depth: 'BASIC', studiedDaysAgo: 2 },
+        { title: 'Busca em largura e profundidade', minutes: 45, priority: 2, depth: 'INTERMEDIATE' },
+        { title: 'Caminho mínimo', minutes: 55, priority: 1, depth: 'INTENSE' },
       ],
     },
   },
@@ -159,8 +162,8 @@ const MATERIAS: readonly SeedSubject[] = [
       title: 'Resenha de artigo',
       dueInDays: 9,
       contents: [
-        { title: 'Leitura do artigo', minutes: 40, priority: 2, dayOffset: 0 },
-        { title: 'Escrita da resenha', minutes: 50, priority: 1, dayOffset: 5 },
+        { title: 'Leitura do artigo', minutes: 40, priority: 2, depth: 'BASIC', studiedDaysAgo: 0 },
+        { title: 'Escrita da resenha', minutes: 50, priority: 1, depth: 'INTERMEDIATE' },
       ],
     },
   },
@@ -185,6 +188,144 @@ async function clearUserData(userId: string): Promise<void> {
   ]);
 }
 
+/** Um conteúdo já gravado, com o que o seed ainda precisa saber sobre ele. */
+interface ConteudoGravado {
+  readonly id: string;
+  readonly title: string;
+  readonly minutes: number;
+  readonly primeiroDaAvaliacao: boolean;
+  readonly studiedDaysAgo: number | undefined;
+}
+
+async function criarMaterias(userId: string, hoje: IsoDate): Promise<ConteudoGravado[]> {
+  const gravados: ConteudoGravado[] = [];
+
+  for (const materia of MATERIAS) {
+    const subject = await prisma.subject.create({
+      data: { userId, name: materia.name, color: materia.color },
+    });
+
+    const assessment = await prisma.assessment.create({
+      data: {
+        userId,
+        subjectId: subject.id,
+        type: materia.assessment.type,
+        title: materia.assessment.title,
+        dueAt: atLocalHour(addDays(hoje, materia.assessment.dueInDays), 14),
+        hasTime: materia.assessment.type === 'EXAM',
+      },
+    });
+
+    for (const [indice, conteudo] of materia.assessment.contents.entries()) {
+      const content = await prisma.studyContent.create({
+        data: {
+          assessmentId: assessment.id,
+          title: conteudo.title,
+          estimatedEffortMinutes: conteudo.minutes,
+          priority: conteudo.priority,
+          depth: conteudo.depth,
+        },
+      });
+
+      gravados.push({
+        id: content.id,
+        title: conteudo.title,
+        minutes: conteudo.minutes,
+        primeiroDaAvaliacao: indice === 0,
+        studiedDaysAgo: conteudo.studiedDaysAgo,
+      });
+    }
+  }
+
+  return gravados;
+}
+
+/**
+ * Grava o histórico: o progresso dos dias já vividos.
+ *
+ * Vem antes do recálculo de propósito. `PlanService` conta as passadas
+ * concluídas a partir daqui, então um conteúdo que já tem progresso `DONE`
+ * volta ao plano só com as passadas que a profundidade ainda pede.
+ *
+ * `activityId` fica nulo. O progresso é ancorado no conteúdo justamente para
+ * sobreviver à troca de plano, e inventar uma atividade só para ter o que
+ * apontar seria criar sessão que nunca foi planejada.
+ */
+async function gravarHistorico(
+  userId: string,
+  hoje: IsoDate,
+  conteudos: readonly ConteudoGravado[],
+): Promise<void> {
+  const estudados = conteudos.filter((conteudo) => conteudo.studiedDaysAgo !== undefined);
+
+  await prisma.studyProgress.createMany({
+    data: estudados.map((conteudo) => {
+      const diasAtras = conteudo.studiedDaysAgo as number;
+      return {
+        userId,
+        contentId: conteudo.id,
+        status: 'DONE' as const,
+        minutesSpent: conteudo.minutes,
+        recordedAt: atLocalHour(addDays(hoje, -diasAtras), 20),
+        note: diasAtras === 0 ? 'Primeiro bloco do dia.' : null,
+      };
+    }),
+  });
+}
+
+/**
+ * Coloca as sessões já concluídas no calendário, depois que o plano existe.
+ *
+ * O distribuidor não produz passado, e o calendário precisa abrir com dias
+ * para trás preenchidos. A posição é calculada a partir do que já está no
+ * dia, para não colidir com o que o algoritmo agendou para hoje.
+ */
+async function registrarSessoesPassadas(
+  planId: string,
+  hoje: IsoDate,
+  conteudos: readonly ConteudoGravado[],
+): Promise<void> {
+  const estudados = conteudos.filter((conteudo) => conteudo.studiedDaysAgo !== undefined);
+
+  for (const conteudo of estudados) {
+    const date = addDays(hoje, -(conteudo.studiedDaysAgo as number));
+    const scheduledDate = toDateColumn(date);
+    const position = await prisma.studyActivity.count({ where: { planId, scheduledDate } });
+
+    await prisma.studyActivity.create({
+      data: {
+        planId,
+        contentId: conteudo.id,
+        title: `${conteudo.primeiroDaAvaliacao ? 'Estudar' : 'Revisar'} ${conteudo.title.toLocaleLowerCase('pt-BR')}`,
+        scheduledDate,
+        estimatedMinutes: conteudo.minutes,
+        position,
+        status: 'DONE',
+      },
+    });
+  }
+}
+
+/**
+ * Deixa a primeira sessão pendente de hoje em andamento.
+ *
+ * A tela desenha três aparências para um item (concluída, em andamento e
+ * planejada) e sem isto a demonstração só mostraria duas.
+ */
+async function marcarSessaoEmAndamento(planId: string, hoje: IsoDate): Promise<void> {
+  const primeira = await prisma.studyActivity.findFirst({
+    where: { planId, scheduledDate: toDateColumn(hoje), status: 'PLANNED' },
+    orderBy: { position: 'asc' },
+  });
+
+  if (primeira !== null) {
+    await prisma.studyActivity.update({
+      where: { id: primeira.id },
+      data: { status: 'IN_PROGRESS' },
+    });
+  }
+}
+
 async function main(): Promise<void> {
   const { email, password } = readCredentials();
   const passwordHash = await hashPassword(password);
@@ -197,7 +338,8 @@ async function main(): Promise<void> {
 
   await clearUserData(user.id);
 
-  const hoje = todayInTimezone(TIMEZONE, new Date());
+  const agora = new Date();
+  const hoje = todayInTimezone(TIMEZONE, agora);
 
   // Disponibilidade habitual: mais tempo em dia de semana do que no fim de semana.
   await prisma.studyAvailability.createMany({
@@ -222,101 +364,29 @@ async function main(): Promise<void> {
     },
   });
 
-  const plan = await prisma.studyPlan.create({
-    data: {
-      userId: user.id,
-      status: 'ACTIVE',
-      algorithmVersion: ALGORITHM_VERSION,
-      horizonStart: toDateColumn(addDays(hoje, -7)),
-      horizonEnd: toDateColumn(addDays(hoje, 21)),
-    },
+  const conteudos = await criarMaterias(user.id, hoje);
+  await gravarHistorico(user.id, hoje, conteudos);
+
+  const resultado = await planService.recalculate(user.id, { kind: 'all' }, agora);
+
+  const plano = await prisma.studyPlan.findFirst({
+    where: { userId: user.id, status: 'ACTIVE' },
   });
 
-  /**
-   * Distribuição das atividades.
-   *
-   * Cada conteúdo tem o seu dia fixado na tabela acima, e não sorteado: um
-   * seed que muda de forma a cada execução torna impossível comparar duas
-   * capturas da mesma tela. Dois dias recebem duas matérias de propósito
-   * (hoje e daqui a dois dias), porque a grade do calendário desenha até dois
-   * pontos por dia e esse caso precisa de dado real.
-   */
-  const ocupacaoPorDia = new Map<IsoDate, number>();
-  const contentIds: string[] = [];
-
-  for (const materia of MATERIAS) {
-    const subject = await prisma.subject.create({
-      data: { userId: user.id, name: materia.name, color: materia.color },
-    });
-
-    const assessment = await prisma.assessment.create({
-      data: {
-        userId: user.id,
-        subjectId: subject.id,
-        type: materia.assessment.type,
-        title: materia.assessment.title,
-        dueAt: atLocalHour(addDays(hoje, materia.assessment.dueInDays), 14),
-        hasTime: materia.assessment.type === 'EXAM',
-      },
-    });
-
-    for (const [indice, conteudo] of materia.assessment.contents.entries()) {
-      const content = await prisma.studyContent.create({
-        data: {
-          assessmentId: assessment.id,
-          title: conteudo.title,
-          estimatedEffortMinutes: conteudo.minutes,
-          priority: conteudo.priority,
-        },
-      });
-
-      contentIds.push(content.id);
-
-      const date = addDays(hoje, conteudo.dayOffset);
-      const position = ocupacaoPorDia.get(date) ?? 0;
-
-      await prisma.studyActivity.create({
-        data: {
-          planId: plan.id,
-          contentId: content.id,
-          title: `${indice === 0 ? 'Estudar' : 'Revisar'} ${conteudo.title.toLowerCase()}`,
-          scheduledDate: toDateColumn(date),
-          estimatedMinutes: conteudo.minutes,
-          position,
-          status: statusDaAtividade(conteudo.dayOffset, position),
-        },
-      });
-
-      ocupacaoPorDia.set(date, position + 1);
-    }
+  if (plano === null) {
+    throw new Error('O recálculo não criou plano ativo. Confira a disponibilidade do seed.');
   }
 
-  /**
-   * Progresso: cinco dias seguidos terminando hoje, para a sequência da tela
-   * inicial ter valor real, mais o registro parcial de hoje para o anel não
-   * abrir zerado. O sexto dia para trás fica de fora de propósito, para que a
-   * sequência seja 5 e não um número que cresce sozinho.
-   *
-   * O progresso aponta para o conteúdo, não para a atividade: é a decisão do
-   * modelo, e é o que faz o histórico sobreviver a um recálculo do plano.
-   */
-  const registros = [4, 3, 2, 1, 0].map((diasAtras, indice) => ({
-    userId: user.id,
-    contentId: contentIds[indice % contentIds.length] as string,
-    status: 'DONE' as const,
-    minutesSpent: diasAtras === 0 ? 45 : 60,
-    recordedAt: atLocalHour(addDays(hoje, -diasAtras), 20),
-    note: diasAtras === 0 ? 'Primeiro bloco do dia.' : null,
-  }));
+  await registrarSessoesPassadas(plano.id, hoje, conteudos);
+  await marcarSessaoEmAndamento(plano.id, hoje);
 
-  await prisma.studyProgress.createMany({ data: registros });
-
-  const atividades = await prisma.studyActivity.count({ where: { planId: plan.id } });
+  const atividades = await prisma.studyActivity.count({ where: { planId: plano.id } });
 
   // Nenhuma credencial neste resumo: só contagens.
   console.log(
     `Seed concluído: 1 usuário de demonstração, ${MATERIAS.length} matérias, ` +
-      `${atividades} atividades entre ${addDays(hoje, -5)} e o fim do horizonte.`,
+      `${atividades} atividades, plano calculado por ${resultado.algorithmVersion}` +
+      `${resultado.conflicts.length > 0 ? ` (${resultado.conflicts.length} aviso(s) de encaixe)` : ''}.`,
   );
 }
 
