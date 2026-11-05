@@ -1,9 +1,16 @@
-import { Button } from '@/components/ui';
+import { StyleSheet, View } from 'react-native';
+
+import { ClockIcon } from '@/components/icons';
+import { Button, ListRow, ScreenContainer } from '@/components/ui';
 import { useSession } from '@/contexts/SessionContext';
-import { EmptyScreen } from '@/views/_templates/_emptyScreen';
+import { useProgressController } from '@/controllers/progress/ProgressController';
+import { spacing } from '@/theme';
+import { ScreenHeader } from '@/views/_templates/_screenHeader';
 
 /**
- * Aba Progresso: histórico e estatísticas de estudo.
+ * Aba Progresso: porta de entrada das telas de acompanhamento.
+ *
+ * Por ora tem uma: Tempo mensal, com o que foi registrado no Timer.
  *
  * Guarda provisoriamente o botão de sair da conta. Ele morava na tela
  * inicial, que agora é o dashboard e não tem esse botão no Figma; o lugar
@@ -12,12 +19,36 @@ import { EmptyScreen } from '@/views/_templates/_emptyScreen';
  */
 export default function Progress() {
   const { signOut } = useSession();
+  const controller = useProgressController();
 
   return (
-    <EmptyScreen
-      title="Progresso"
-      description="O histórico das suas sessões e a evolução por matéria vão aparecer aqui. A tela entra numa próxima etapa."
-      footer={<Button label="Sair da conta" variant="secondary" onPress={() => void signOut()} />}
-    />
+    <ScreenContainer>
+      <ScreenHeader
+        title="Progresso"
+        subtitle="Acompanhe a sua evolução nos estudos."
+      />
+
+      <View style={styles.lista}>
+        <ListRow
+          title="Tempo mensal"
+          subtitle="Quanto você estudou em cada mês, por dia e por matéria"
+          icon={ClockIcon}
+          onPress={controller.goToMonthlyTime}
+        />
+      </View>
+
+      <View style={styles.rodape}>
+        <Button label="Sair da conta" variant="secondary" onPress={() => void signOut()} />
+      </View>
+    </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  lista: {
+    gap: spacing.md,
+  },
+  rodape: {
+    marginTop: spacing.xxl,
+  },
+});

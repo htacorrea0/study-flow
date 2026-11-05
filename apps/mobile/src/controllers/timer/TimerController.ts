@@ -1,0 +1,449 @@
+import type { SubjectResponse, StudyTimeSource } from '@study-flow/shared';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { ApiError } from '@/services/api';
+import { registerStudyTime } from '@/services/activities/ActivityService';
+import { fetchSubjects } from '@/services/subjects/SubjectService';
+import { formatClockDuration } from '@/utils/duration';
+
+const DEFAULT_TIMER_SECONDS = 25 * 60;
+const MIN_TIMER_SECONDS = 1;
+/** Mesmo teto que a API aceita num único registro. */
+const MAX_TIMER_SECONDS = 24 * 60 * 60;
+/** HHMMSS: seis dígitos, como no relógio do celular. */
+const ENTRY_MAX_DIGITS = 6;
+
+type TimerMode = 'timer' | 'cronometro';
+
+type SubjectLoadStatus = 'loading' | 'ready' | 'error';
+
+type StopwatchLap = {
+  readonly id: string;
+  readonly subjectName: string;
+  readonly seconds: number;
+};
+
+type RegisterPrompt = {
+  readonly visible: boolean;
+  readonly seconds: number;
+  readonly source: StudyTimeSource;
+  readonly subjectId: string | null;
+};
+
+export type TimerController = {
+  readonly mode: TimerMode;
+  readonly switchMode: (nextMode: TimerMode) => void;
+
+  readonly subjects: readonly SubjectResponse[];
+  readonly subjectLoadStatus: SubjectLoadStatus;
+  readonly subjectError: string | null;
+  readonly selectedSubjectId: string | null;
+  readonly setSelectedSubjectId: (subjectId: string | null) => void;
+  readonly selectedSubjectName: string;
+
+  readonly registerPromptVisible: boolean;
+  readonly registerPromptSeconds: number;
+  readonly registeringStudyTime: boolean;
+  readonly registerFeedback: string | null;
+  readonly confirmRegisterStudyTime: () => void;
+  readonly cancelRegisterStudyTime: () => void;
+
+  readonly countdownRemainingSeconds: number;
+  readonly countdownDurationSeconds: number;
+  readonly countdownRunning: boolean;
+  readonly countdownFinished: boolean;
+  readonly countdownFormatted: string;
+  readonly countdownProgressPercent: number;
+  readonly startOrPauseCountdown: () => void;
+  readonly resetCountdown: () => void;
+  readonly increaseCountdown: () => void;
+  readonly decreaseCountdown: () => void;
+  readonly applyCountdownPreset: (seconds: number) => void;
+
+  /**
+   * Digitação do tempo no estilo do relógio do celular: os dígitos entram
+   * pela direita e empurram os anteriores (`2`, `25`, `250`, `2500` →
+   * 00h 25m 00s).
+   */
+  readonly entryDigits: string;
+  readonly entryFormatted: string;
+  readonly setEntryDigits: (value: string) => void;
+  /** `false` com o timer em andamento, pausado no meio ou terminado. */
+  readonly canEditDuration: boolean;
+  /** `false` quando a digitação ainda está zerada. */
+  readonly canStartCountdown: boolean;
+
+  readonly stopwatchSeconds: number;
+  readonly stopwatchRunning: boolean;
+  readonly stopwatchFormatted: string;
+  readonly stopwatchLaps: readonly StopwatchLap[];
+  readonly startOrPauseStopwatch: () => void;
+  readonly resetStopwatch: () => void;
+  readonly markStopwatchLap: () => void;
+};
+
+function digitsToSeconds(digits: string): number {
+  const padded = digits.padStart(ENTRY_MAX_DIGITS, '0');
+  return (
+    Number(padded.slice(0, 2)) * 3600 + Number(padded.slice(2, 4)) * 60 + Number(padded.slice(4, 6))
+  );
+}
+
+function secondsToDigits(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const value = hours * 10000 + minutes * 100 + seconds;
+
+  return value === 0 ? '' : String(value);
+}
+
+function formatEntry(digits: string): string {
+  const padded = digits.padStart(ENTRY_MAX_DIGITS, '0');
+  return `${padded.slice(0, 2)}h ${padded.slice(2, 4)}m ${padded.slice(4, 6)}s`;
+}
+
+/**
+ * Estado e regras da aba Timer.
+ *
+ * Dois modos em uma única tela: um timer regressivo para sessão focada e um
+ * cronômetro livre para medir estudo sem meta fixa.
+ *
+ * O total de tempo estudado NÃO aparece aqui: o timer só registra. O
+ * acumulado do mês vive na aba Progresso (Tempo mensal).
+ */
+export function useTimerController(): TimerController {
+  const [mode, setMode] = useState<TimerMode>('timer');
+
+  const [subjects, setSubjects] = useState<readonly SubjectResponse[]>([]);
+  const [subjectLoadStatus, setSubjectLoadStatus] = useState<SubjectLoadStatus>('loading');
+  const [subjectError, setSubjectError] = useState<string | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+
+  const [countdownDurationSeconds, setCountdownDurationSeconds] =
+    useState(DEFAULT_TIMER_SECONDS);
+  const [countdownRemainingSeconds, setCountdownRemainingSeconds] =
+    useState(DEFAULT_TIMER_SECONDS);
+  const [countdownRunning, setCountdownRunning] = useState(false);
+  const [countdownSegmentStartRemainingSeconds, setCountdownSegmentStartRemainingSeconds] =
+    useState(DEFAULT_TIMER_SECONDS);
+
+  const [entryDigits, setEntryDigitsState] = useState(() =>
+    secondsToDigits(DEFAULT_TIMER_SECONDS),
+  );
+
+  const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
+  const [stopwatchRunning, setStopwatchRunning] = useState(false);
+  const [stopwatchSegmentStartSeconds, setStopwatchSegmentStartSeconds] = useState(0);
+  const [stopwatchLaps, setStopwatchLaps] = useState<readonly StopwatchLap[]>([]);
+
+  const [registerPrompt, setRegisterPrompt] = useState<RegisterPrompt>({
+    visible: false,
+    seconds: 0,
+    source: 'TIMER',
+    subjectId: null,
+  });
+  const [registeringStudyTime, setRegisteringStudyTime] = useState(false);
+  const [registerFeedback, setRegisterFeedback] = useState<string | null>(null);
+
+  const selectedSubjectName = useMemo(() => {
+    if (selectedSubjectId === null) {
+      return 'Sem matéria';
+    }
+
+    return subjects.find((subject) => subject.id === selectedSubjectId)?.name ?? 'Sem matéria';
+  }, [selectedSubjectId, subjects]);
+
+  const loadSubjects = useCallback(async () => {
+    setSubjectLoadStatus('loading');
+    setSubjectError(null);
+
+    try {
+      const fetched = await fetchSubjects();
+      setSubjects(fetched);
+      setSubjectLoadStatus('ready');
+      setSelectedSubjectId((current) => {
+        if (fetched.length === 0) {
+          return null;
+        }
+        if (current !== null && fetched.some((subject) => subject.id === current)) {
+          return current;
+        }
+        return fetched[0]?.id ?? null;
+      });
+    } catch (error) {
+      setSubjectLoadStatus('error');
+      setSubjectError(error instanceof ApiError ? error.message : 'Não foi possível carregar matérias.');
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadSubjects();
+    }, [loadSubjects]),
+  );
+
+  /** Aplica uma duração vinda de preset ou dos botões +/-, e reflete na digitação. */
+  function setCountdownTotal(totalSeconds: number): void {
+    const next = Math.min(MAX_TIMER_SECONDS, Math.max(MIN_TIMER_SECONDS, totalSeconds));
+    setCountdownDurationSeconds(next);
+    setCountdownRemainingSeconds(next);
+    setCountdownSegmentStartRemainingSeconds(next);
+    setEntryDigitsState(secondsToDigits(next));
+  }
+
+  function setEntryDigits(value: string): void {
+    const onlyDigits = value.replace(/\D/g, '');
+    // Zeros à esquerda não mudam o valor e comeriam as casas disponíveis.
+    const trimmed = onlyDigits.replace(/^0+/, '').slice(-ENTRY_MAX_DIGITS);
+
+    const total = digitsToSeconds(trimmed);
+
+    if (total > MAX_TIMER_SECONDS) {
+      setCountdownRunning(false);
+      setCountdownTotal(MAX_TIMER_SECONDS);
+      return;
+    }
+
+    setEntryDigitsState(trimmed);
+
+    if (total >= MIN_TIMER_SECONDS) {
+      setCountdownRunning(false);
+      setCountdownDurationSeconds(total);
+      setCountdownRemainingSeconds(total);
+      setCountdownSegmentStartRemainingSeconds(total);
+    }
+  }
+
+  function openRegisterPrompt(source: StudyTimeSource, seconds: number): void {
+    if (seconds <= 0) {
+      return;
+    }
+
+    setRegisterPrompt({ visible: true, source, seconds, subjectId: selectedSubjectId });
+  }
+
+  useEffect(() => {
+    if (!countdownRunning) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setCountdownRemainingSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [countdownRunning]);
+
+  useEffect(() => {
+    if (countdownRunning && countdownRemainingSeconds === 0) {
+      setCountdownRunning(false);
+      const studied = countdownSegmentStartRemainingSeconds;
+      openRegisterPrompt('TIMER', studied);
+      setCountdownSegmentStartRemainingSeconds(0);
+    }
+  }, [countdownRemainingSeconds, countdownRunning, countdownSegmentStartRemainingSeconds]);
+
+  useEffect(() => {
+    if (!stopwatchRunning) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setStopwatchSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [stopwatchRunning]);
+
+  function switchMode(nextMode: TimerMode): void {
+    setMode(nextMode);
+
+    if (nextMode === 'timer') {
+      setStopwatchRunning(false);
+      return;
+    }
+
+    setCountdownRunning(false);
+  }
+
+  function startOrPauseCountdown(): void {
+    if (countdownRunning) {
+      setCountdownRunning(false);
+      const studied = countdownSegmentStartRemainingSeconds - countdownRemainingSeconds;
+      setCountdownSegmentStartRemainingSeconds(countdownRemainingSeconds);
+      openRegisterPrompt('TIMER', studied);
+      return;
+    }
+
+    if (countdownRemainingSeconds === 0) {
+      setCountdownRemainingSeconds(countdownDurationSeconds);
+      setCountdownSegmentStartRemainingSeconds(countdownDurationSeconds);
+    } else {
+      setCountdownSegmentStartRemainingSeconds(countdownRemainingSeconds);
+    }
+
+    setCountdownRunning(true);
+  }
+
+  function resetCountdown(): void {
+    setCountdownRunning(false);
+    setCountdownRemainingSeconds(countdownDurationSeconds);
+    setCountdownSegmentStartRemainingSeconds(countdownDurationSeconds);
+  }
+
+  function increaseCountdown(): void {
+    setCountdownRunning(false);
+    setCountdownTotal(countdownDurationSeconds + 60);
+  }
+
+  function decreaseCountdown(): void {
+    setCountdownRunning(false);
+    setCountdownTotal(countdownDurationSeconds - 60);
+  }
+
+  function applyCountdownPreset(seconds: number): void {
+    setCountdownRunning(false);
+    setCountdownTotal(seconds);
+  }
+
+  function startOrPauseStopwatch(): void {
+    if (stopwatchRunning) {
+      setStopwatchRunning(false);
+      const studied = stopwatchSeconds - stopwatchSegmentStartSeconds;
+      setStopwatchSegmentStartSeconds(stopwatchSeconds);
+      openRegisterPrompt('STOPWATCH', studied);
+      return;
+    }
+
+    setStopwatchSegmentStartSeconds(stopwatchSeconds);
+    setStopwatchRunning(true);
+  }
+
+  function resetStopwatch(): void {
+    setStopwatchRunning(false);
+    setStopwatchSeconds(0);
+    setStopwatchSegmentStartSeconds(0);
+    setStopwatchLaps([]);
+  }
+
+  function markStopwatchLap(): void {
+    const segmentSeconds = stopwatchSeconds - stopwatchSegmentStartSeconds;
+
+    if (segmentSeconds <= 0) {
+      setRegisterFeedback('Inicie o cronômetro e aguarde alguns segundos antes de marcar.');
+      return;
+    }
+
+    setStopwatchLaps((current) => [
+      {
+        id: `${Date.now()}-${current.length}`,
+        subjectName: selectedSubjectName,
+        seconds: segmentSeconds,
+      },
+      ...current,
+    ]);
+    setStopwatchSegmentStartSeconds(stopwatchSeconds);
+    setRegisterFeedback(
+      `Trecho marcado: ${formatClockDuration(segmentSeconds)} em ${selectedSubjectName}.`,
+    );
+  }
+
+  async function confirmRegisterStudyTime(): Promise<void> {
+    if (!registerPrompt.visible || registeringStudyTime || registerPrompt.seconds <= 0) {
+      return;
+    }
+
+    setRegisteringStudyTime(true);
+
+    try {
+      // Sem texto de confirmação: o acumulado fica na aba Progresso.
+      await registerStudyTime({
+        seconds: registerPrompt.seconds,
+        source: registerPrompt.source,
+        ...(registerPrompt.subjectId === null ? {} : { subjectId: registerPrompt.subjectId }),
+      });
+
+      setRegisterFeedback(null);
+      setRegisterPrompt((current) => ({ ...current, visible: false }));
+    } catch (error) {
+      setRegisterFeedback(
+        error instanceof ApiError
+          ? error.message
+          : 'Não foi possível registrar seu tempo agora. Tente novamente.',
+      );
+    } finally {
+      setRegisteringStudyTime(false);
+    }
+  }
+
+  function cancelRegisterStudyTime(): void {
+    if (registeringStudyTime) {
+      return;
+    }
+
+    setRegisterPrompt((current) => ({ ...current, visible: false }));
+  }
+
+  const countdownProgressPercent = useMemo(() => {
+    if (countdownDurationSeconds <= 0) {
+      return 0;
+    }
+
+    const elapsed = countdownDurationSeconds - countdownRemainingSeconds;
+    return Math.min(100, Math.max(0, (elapsed / countdownDurationSeconds) * 100));
+  }, [countdownDurationSeconds, countdownRemainingSeconds]);
+
+  const canEditDuration =
+    !countdownRunning && countdownRemainingSeconds === countdownDurationSeconds;
+
+  return {
+    mode,
+    switchMode,
+
+    subjects,
+    subjectLoadStatus,
+    subjectError,
+    selectedSubjectId,
+    setSelectedSubjectId,
+    selectedSubjectName,
+
+    registerPromptVisible: registerPrompt.visible,
+    registerPromptSeconds: registerPrompt.seconds,
+    registeringStudyTime,
+    registerFeedback,
+    confirmRegisterStudyTime: () => void confirmRegisterStudyTime(),
+    cancelRegisterStudyTime,
+
+    countdownRemainingSeconds,
+    countdownDurationSeconds,
+    countdownRunning,
+    countdownFinished: countdownRemainingSeconds === 0,
+    countdownFormatted: formatClockDuration(countdownRemainingSeconds),
+    countdownProgressPercent,
+    startOrPauseCountdown,
+    resetCountdown,
+    increaseCountdown,
+    decreaseCountdown,
+    applyCountdownPreset,
+
+    entryDigits,
+    entryFormatted: formatEntry(entryDigits),
+    setEntryDigits,
+    canEditDuration,
+    canStartCountdown: countdownRunning || digitsToSeconds(entryDigits) >= MIN_TIMER_SECONDS,
+
+    stopwatchSeconds,
+    stopwatchRunning,
+    stopwatchFormatted: formatClockDuration(stopwatchSeconds),
+    stopwatchLaps,
+    startOrPauseStopwatch,
+    resetStopwatch,
+    markStopwatchLap,
+  };
+}

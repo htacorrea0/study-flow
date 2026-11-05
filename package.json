@@ -34,5 +34,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "typescript": "~6.0.3"
+  },
+  "dependencies": {
+    "@node-rs/argon2-win32-x64-msvc": "^2.2.2"
   }
 }

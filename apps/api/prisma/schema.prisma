@@ -72,6 +72,11 @@ enum Weekday {
   SUNDAY
 }
 
+enum StudyTimeSource {
+  TIMER
+  STOPWATCH
+}
+
 // -------------------------------- Modelos ----------------------------------
 
 /// Pessoa usuária do aplicativo.
@@ -97,6 +102,7 @@ model User {
   availabilityExceptions AvailabilityException[]
   studyPlans             StudyPlan[]
   progressRecords        StudyProgress[]
+  studyTimeEntries       StudyTimeEntry[]
   notificationPreference NotificationPreference?
 
   @@map("users")
@@ -115,6 +121,7 @@ model Subject {
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   assessments Assessment[]
+  studyTimeEntries StudyTimeEntry[]
 
   @@unique([userId, name])
   @@map("subjects")
@@ -319,6 +326,26 @@ model StudyProgress {
   @@index([userId, recordedAt])
   @@index([contentId])
   @@map("study_progress")
+}
+
+/// Registro manual de tempo estudado na aba Timer/Cronômetro.
+///
+/// Guarda blocos de segundos para compor o total diário sem depender de
+/// confirmação de sessão do calendário.
+model StudyTimeEntry {
+  id        String          @id @default(uuid()) @db.Uuid
+  userId    String          @db.Uuid
+  subjectId String?         @db.Uuid
+  source    StudyTimeSource
+  seconds   Int
+  recordedAt DateTime       @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, recordedAt])
+  @@index([subjectId])
+  @@map("study_time_entries")
 }
 
 /// Material de apoio sugerido para um conteúdo.

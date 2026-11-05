@@ -16,6 +16,7 @@ export { FlagIcon } from './FlagIcon';
 export { FlameIcon } from './FlameIcon';
 export { GlobeIcon } from './GlobeIcon';
 export { HomeIcon } from './HomeIcon';
+export { InfoIcon } from './InfoIcon';
 export { LockIcon } from './LockIcon';
 export { MailIcon } from './MailIcon';
 export { MapIcon } from './MapIcon';
