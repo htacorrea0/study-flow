@@ -12,9 +12,8 @@ const ROTULO = 'Iniciar sessão de estudo';
 /**
  * Botão verde do nó `5:112`.
  *
- * Leva para a aba Timer, que ainda é uma tela em branco. Mandar para uma
- * tela que se declara inacabada é mais honesto do que simular um cronômetro
- * que não existe, e o botão está no Figma.
+ * Leva para a aba Timer, onde a pessoa escolhe entre timer regressivo e
+ * cronômetro livre para iniciar a sessão de estudo.
  */
 export function QuickStartButton({ onPress }: QuickStartButtonProps) {
   return (

@@ -6,6 +6,7 @@ import * as availabilityModel from '../models/AvailabilityModel';
 import * as studyActivityModel from '../models/StudyActivityModel';
 import * as studyPlanModel from '../models/StudyPlanModel';
 import * as studyProgressModel from '../models/StudyProgressModel';
+import * as studyTimeEntryModel from '../models/StudyTimeEntryModel';
 import * as userModel from '../models/UserModel';
 import {
   computeStreak,
@@ -93,7 +94,14 @@ async function resolveDoneMinutes(
 ): Promise<number> {
   const { start, end } = dayBoundsUtc(today, timezone);
 
-  return studyProgressModel.sumMinutesSpentInRange(userId, start, end);
+  const [minutesFromProgress, secondsFromTimer] = await Promise.all([
+    studyProgressModel.sumMinutesSpentInRange(userId, start, end),
+    studyTimeEntryModel.sumSecondsInRange(userId, start, end),
+  ]);
+
+  const minutesFromTimer = Math.round(secondsFromTimer / 60);
+
+  return minutesFromProgress + minutesFromTimer;
 }
 
 async function resolveStreak(
@@ -103,8 +111,13 @@ async function resolveStreak(
   now: Date,
 ): Promise<number> {
   const since = new Date(now.getTime() - DIAS_DE_HISTORICO_PARA_O_STREAK * 24 * 60 * 60 * 1000);
-  const timestamps = await studyProgressModel.findDoneTimestampsSince(userId, since);
-  const dias = timestamps.map((instant) => toIsoDateInTimezone(instant, timezone));
+  const [timestampsFromProgress, timestampsFromTimer] = await Promise.all([
+    studyProgressModel.findDoneTimestampsSince(userId, since),
+    studyTimeEntryModel.findRecordedTimestampsSince(userId, since),
+  ]);
+  const dias = [...timestampsFromProgress, ...timestampsFromTimer].map((instant) =>
+    toIsoDateInTimezone(instant, timezone),
+  );
 
   return computeStreak(dias, today);
 }
