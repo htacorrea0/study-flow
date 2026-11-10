@@ -1,7 +1,9 @@
-import type { SubjectResponse } from '@study-flow/shared';
+import type { AiStudyPlan, SubjectResponse } from '@study-flow/shared';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
+import { useSavedStudyPlan } from '@/hooks/useSavedStudyPlan';
+import type { PlanEntry } from '@/utils/aiPlan';
 import { ApiError } from '@/services/api';
 import { deleteSubject, fetchSubjects } from '@/services/subjects/SubjectService';
 
@@ -21,6 +23,17 @@ export type SubjectsController = {
   readonly askDeletion: (subject: SubjectResponse) => void;
   readonly cancelDeletion: () => void;
   readonly confirmDeletion: () => void;
+  /** Plano da IA aplicado pelo chat, ou `null`. */
+  readonly aiPlan: AiStudyPlan | null;
+  readonly aiPlanSavedAt: string | null;
+  /** Plano atual e os anteriores guardados no aparelho, do mais novo ao mais antigo. */
+  readonly aiPlanEntries: readonly PlanEntry[];
+  /** Diálogo de "remover recomendações da IA" aberto. */
+  readonly confirmingAiPlanRemoval: boolean;
+  readonly removingAiPlan: boolean;
+  readonly askAiPlanRemoval: () => void;
+  readonly cancelAiPlanRemoval: () => void;
+  readonly confirmAiPlanRemoval: () => void;
 };
 
 function mensagemDe(error: unknown, padrao: string): string {
@@ -44,6 +57,10 @@ export function useSubjectsController(): SubjectsController {
   const [deleting, setDeleting] = useState(false);
 
   const jaCarregou = useRef(false);
+
+  // O plano da IA é um extra: se a busca falhar, a lista segue normal.
+  const planoIa = useSavedStudyPlan();
+  const [confirmingAiPlanRemoval, setConfirmingAiPlanRemoval] = useState(false);
 
   const load = useCallback(async (comEsqueleto: boolean): Promise<void> => {
     if (comEsqueleto) {
@@ -106,6 +123,23 @@ export function useSubjectsController(): SubjectsController {
       if (pendingDeletion !== null && !deleting) {
         void apagar(pendingDeletion);
       }
+    },
+    aiPlan: planoIa.plan,
+    aiPlanSavedAt: planoIa.savedAt,
+    aiPlanEntries: planoIa.entries,
+    confirmingAiPlanRemoval,
+    removingAiPlan: planoIa.removing,
+    askAiPlanRemoval: () => setConfirmingAiPlanRemoval(true),
+    cancelAiPlanRemoval: () => setConfirmingAiPlanRemoval(false),
+    confirmAiPlanRemoval: () => {
+      if (planoIa.removing) return;
+      void planoIa
+        .remove()
+        .then(() => setConfirmingAiPlanRemoval(false))
+        .catch((error: unknown) => {
+          setConfirmingAiPlanRemoval(false);
+          setErrorMessage(mensagemDe(error, 'Não foi possível remover o plano da IA.'));
+        });
     },
   };
 }

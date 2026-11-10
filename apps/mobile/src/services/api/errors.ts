@@ -58,6 +58,14 @@ export function normalizeApiError(error: unknown): ApiError {
       });
     }
 
+    if (status === null && error.code === 'ECONNABORTED') {
+      return new ApiError({
+        message: 'O servidor demorou demais para responder. Tente de novo em instantes.',
+        code: 'INTERNAL_ERROR',
+        statusCode: null,
+      });
+    }
+
     if (status === null) {
       return new ApiError({
         message:

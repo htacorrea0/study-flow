@@ -7,6 +7,8 @@ import { colors, spacing, typography } from '@/theme';
 import { ErrorState } from '@/views/_templates/_errorState';
 import { ScreenTopBar } from '@/views/_templates/_screenTopBar';
 import { SkeletonBlock } from '@/views/_templates/_skeletonBlock';
+import { planSubjectsMissing, resolveSubjectGuidance } from '@/utils/aiPlan';
+import { AiPlanCard } from './_aiPlanCard';
 import { SubjectRow } from './_subjectRow';
 
 /**
@@ -18,6 +20,8 @@ import { SubjectRow } from './_subjectRow';
  */
 export default function Subjects() {
   const controller = useSubjectsController();
+  // O plano atual; sem internet, o mais recente guardado no aparelho.
+  const planoDoTopo = controller.aiPlanEntries[0] ?? null;
 
   return (
     <ScreenContainer>
@@ -35,6 +39,24 @@ export default function Subjects() {
           icon={CalendarIcon}
           onPress={controller.goToAvailability}
         />
+
+        {planoDoTopo && controller.status === 'ready' ? (
+          <AiPlanCard
+            plan={planoDoTopo.plan}
+            savedAt={planoDoTopo.savedAt}
+            missing={planSubjectsMissing(
+              planoDoTopo.plan,
+              controller.subjects.map((subject) => subject.name),
+            )}
+            followingPrevious={
+              controller.subjects.filter(
+                (subject) =>
+                  resolveSubjectGuidance(controller.aiPlanEntries, subject.name)?.fromPreviousPlan,
+              ).length
+            }
+            onRemove={controller.askAiPlanRemoval}
+          />
+        ) : null}
 
         {controller.status === 'loading' ? (
           <View style={styles.lista}>
@@ -74,6 +96,7 @@ export default function Subjects() {
                   subject={subject}
                   onOpen={() => controller.goToSubject(subject.id)}
                   onDelete={() => controller.askDeletion(subject)}
+                  guidance={resolveSubjectGuidance(controller.aiPlanEntries, subject.name)}
                 />
               ))
             )}
@@ -90,6 +113,17 @@ export default function Subjects() {
         confirming={controller.deleting}
         onConfirm={controller.confirmDeletion}
         onCancel={controller.cancelDeletion}
+      />
+
+      <ConfirmDialog
+        visible={controller.confirmingAiPlanRemoval}
+        title="Remover plano da IA"
+        message="As recomendações de tempo e conteúdo somem das matérias, inclusive as dos planos anteriores guardados neste aparelho. As matérias continuam cadastradas, e você pode aplicar outro plano pelo chat do Gemini."
+        confirmLabel="Remover"
+        destructive
+        confirming={controller.removingAiPlan}
+        onConfirm={controller.confirmAiPlanRemoval}
+        onCancel={controller.cancelAiPlanRemoval}
       />
     </ScreenContainer>
   );

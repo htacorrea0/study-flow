@@ -6,6 +6,8 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { useSavedStudyPlan } from '@/hooks/useSavedStudyPlan';
+import type { PlanEntry } from '@/utils/aiPlan';
 import { fetchAssessments } from '@/services/assessments/AssessmentService';
 import { createSubject, fetchSubjects, updateSubject } from '@/services/subjects/SubjectService';
 import { toFormErrors, type FormErrors } from '@/utils/formErrors';
@@ -26,6 +28,16 @@ export type SubjectFormController = {
   readonly submitting: boolean;
   /** As avaliações da matéria. Vazio enquanto ela não existe. */
   readonly assessments: readonly AssessmentListItem[];
+  /**
+   * Planos da IA conhecidos (o atual e os anteriores guardados no aparelho),
+   * para mostrar o que estudar nesta matéria.
+   */
+  readonly aiPlanEntries: readonly PlanEntry[];
+  /**
+   * Nome usado para achar a matéria no plano: o que veio do servidor, e não
+   * o que está sendo digitado, para o quadro da IA não sumir no meio da edição.
+   */
+  readonly savedName: string;
   readonly setName: (value: string) => void;
   readonly setColor: (value: string | null) => void;
   readonly validateNameOnBlur: () => void;
@@ -63,6 +75,8 @@ export function useSubjectFormController(idDaRota: string | undefined): SubjectF
   const [assessments, setAssessments] = useState<readonly AssessmentListItem[]>([]);
   const [errors, setErrors] = useState<FormErrors<SubjectField>>(EMPTY_ERRORS);
   const [submitting, setSubmitting] = useState(false);
+  const planoIa = useSavedStudyPlan();
+  const [savedName, setSavedName] = useState('');
 
   const load = useCallback(async (alvo: string): Promise<void> => {
     setStatus('loading');
@@ -81,6 +95,7 @@ export function useSubjectFormController(idDaRota: string | undefined): SubjectF
       }
 
       setName(atual.name);
+      setSavedName(atual.name);
       setColor(atual.color);
       setAssessments(avaliacoes);
       setStatus('ready');
@@ -183,6 +198,8 @@ export function useSubjectFormController(idDaRota: string | undefined): SubjectF
     errors,
     submitting,
     assessments,
+    aiPlanEntries: planoIa.entries,
+    savedName,
     setName,
     setColor,
     validateNameOnBlur,

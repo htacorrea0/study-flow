@@ -8,6 +8,7 @@ import { spacing, typography } from '@/theme';
 import { ErrorState } from '@/views/_templates/_errorState';
 import { ScreenTopBar } from '@/views/_templates/_screenTopBar';
 import { SkeletonBlock } from '@/views/_templates/_skeletonBlock';
+import { AiGuidance } from './_aiGuidance';
 import { SubjectForm } from './_subjectForm';
 
 /** `PROVA` e `TRABALHO` na lista, para a linha dizer o que é sem abrir. */
@@ -24,6 +25,9 @@ function primeiroParametro(valor: string | string[] | undefined): string | undef
  * porque é daqui que a pessoa chega nelas: a prova pertence à matéria, e
  * cadastrar uma matéria sem logo poder marcar a prova dela deixa o cadastro
  * pela metade.
+ *
+ * Com um plano da IA aplicado, o quadro "O que estudar" aparece entre o
+ * formulário e as avaliações: tempo por semana, conteúdos e os dias.
  *
  * Na criação a lista nem aparece: não existe avaliação a que pendurar nada
  * enquanto a matéria não tem id.
@@ -60,6 +64,10 @@ export default function Subject() {
       ) : (
         <SubjectForm controller={controller} />
       )}
+
+      {controller.editing && controller.status === 'ready' ? (
+        <AiGuidance entries={controller.aiPlanEntries} subjectName={controller.savedName} />
+      ) : null}
 
       {controller.editing && controller.status === 'ready' ? (
         <View style={styles.bloco}>
