@@ -6,4 +6,5 @@ requisição, debounce, formatação reativa de datas.
 Hook que serve a uma tela só não fica aqui: ele é o controller dela, em
 `src/controllers/<tela>/`.
 
-Vazio nesta etapa.
+Hoje: `useKeyboardOverlap` (teclado sobre a tela) e `useSavedStudyPlan` (plano da IA
+aplicado, usado na lista e no detalhe de matérias).

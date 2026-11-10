@@ -15,6 +15,7 @@ export const API_ERROR_CODES = [
   'CONFLICT',
   'TOO_MANY_REQUESTS',
   'INTERNAL_ERROR',
+  'SERVICE_UNAVAILABLE',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 

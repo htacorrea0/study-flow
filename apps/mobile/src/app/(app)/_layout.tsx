@@ -1,8 +1,10 @@
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
+import { View } from 'react-native';
 
 import { BottomTabBar } from '@/components/navigation/BottomTabBar';
 import { useSession } from '@/contexts/SessionContext';
+import { AssistantLauncher } from '@/views/studyAssistant/_assistantLauncher';
 
 /**
  * Guarda e navegação das telas autenticadas.
@@ -32,13 +34,18 @@ export default function AppLayout() {
     return <Redirect href="/login" />;
   }
 
+  // O botão do Gemini flutua por cima de todas as abas; por isso as abas e
+  // ele dividem um mesmo contêiner, com o botão desenhado depois (por cima).
   return (
-    <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <BottomTabBar {...props} />}>
-      <Tabs.Screen name="index" options={{ title: 'Início' }} />
-      <Tabs.Screen name="materias" options={{ title: 'Matérias' }} />
-      <Tabs.Screen name="calendario" options={{ title: 'Calendário' }} />
-      <Tabs.Screen name="timer" options={{ title: 'Timer' }} />
-      <Tabs.Screen name="progresso" options={{ title: 'Progresso' }} />
-    </Tabs>
+    <View style={{ flex: 1 }}>
+      <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <BottomTabBar {...props} />}>
+        <Tabs.Screen name="index" options={{ title: 'Início' }} />
+        <Tabs.Screen name="materias" options={{ title: 'Matérias' }} />
+        <Tabs.Screen name="calendario" options={{ title: 'Calendário' }} />
+        <Tabs.Screen name="timer" options={{ title: 'Timer' }} />
+        <Tabs.Screen name="progresso" options={{ title: 'Progresso' }} />
+      </Tabs>
+      <AssistantLauncher />
+    </View>
   );
 }

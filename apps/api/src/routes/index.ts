@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { activityRoutes } from './ActivityRoutes';
+import { aiRoutes } from './AiRoutes';
 import { assessmentRoutes } from './AssessmentRoutes';
 import { authRoutes } from './AuthRoutes';
 import { availabilityRoutes } from './AvailabilityRoutes';
@@ -31,3 +32,4 @@ routes.use('/assessments', assessmentRoutes);
 routes.use('/contents', contentRoutes);
 routes.use('/availability', availabilityRoutes);
 routes.use('/activities', activityRoutes);
+routes.use('/ai', aiRoutes);

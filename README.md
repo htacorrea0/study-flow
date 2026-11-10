@@ -30,6 +30,7 @@ recalcula conforme o progresso real.
 12. [Arquitetura em resumo](#12-arquitetura-em-resumo)
 13. [O que ainda não foi implementado](#13-o-que-ainda-não-foi-implementado)
 14. [Troubleshooting](#14-troubleshooting)
+15. [Assistente de estudos com Gemini](#15-assistente-de-estudos-com-gemini)
 
 ---
 
@@ -67,6 +68,10 @@ O Study Flow resolve isso em quatro movimentos:
 | Banco | PostgreSQL 18 | Relacional, que é a natureza do domínio (usuário → matéria → avaliação → conteúdo). |
 | Validação | Zod 4 | Valida a entrada e já gera o tipo — sem duplicar a definição. |
 | Autenticação | JWT + Argon2id | Padrão para API sem estado; Argon2id é a recomendação atual para hash de senha. |
+| IA | Google Gemini (API REST, sem SDK) | Lê o plano de aulas (PDF, foto ou texto) e devolve um plano de estudos estruturado. A chave fica só no backend. |
+| Upload | Multer (em memória) | Recebe o arquivo do plano de aulas e repassa ao Gemini sem gravar nada no servidor. |
+| Arquivos no app | expo-document-picker | Seletor de arquivos do sistema, para anexar o plano de aulas no chat. |
+| Cache local | AsyncStorage | Guarda no aparelho os planos da IA anteriores, para as matérias não perderem o que estudar. |
 | Testes | Vitest + Supertest | Roda TypeScript sem configuração extra; Supertest testa as rotas sem abrir porta. |
 | Repositório | npm workspaces | App, API e contratos compartilhados no mesmo repositório. |
 
@@ -85,6 +90,7 @@ estão em [`docs/design-system.md`](docs/design-system.md).
 | npm | 10 | `npm --version` |
 | Docker + Docker Compose | Compose v2.17 | `docker --version` e `docker compose version` |
 | Git | qualquer recente | `git --version` |
+| Conta Google | — | Só para o assistente com IA: gera a chave gratuita do Gemini em [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey). |
 
 No celular:
 
@@ -164,6 +170,13 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 Cole o valor em `apps/api/.env`, na linha `JWT_SECRET=`. A API **não sobe**
 com um segredo de menos de 32 caracteres — é proposital.
 
+**Opcional — chave do Gemini (assistente de estudos).** Gere a chave em
+[aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+(**Create API key**) e cole em `apps/api/.env`, na linha `GEMINI_API_KEY=`, sem
+aspas. Chaves novas começam com `AQ.` — é o formato atual do Google, está certo.
+Sem a chave o projeto roda normalmente; só o chat do assistente avisa que não
+foi configurado. Para conferir a chave: `npm run gemini:check`.
+
 ### Passo 4 — Subir o banco e aplicar as migrations
 
 ```bash
@@ -195,6 +208,15 @@ npm run dev:mobile
 
 Leia o QR code com o **Expo Go** (Android) ou com a **câmera** (iOS).
 
+Depois de entrar no app, o botão redondo com o ícone do **Gemini**, no canto
+inferior direito, abre o assistente de estudos (seção
+[15](#15-assistente-de-estudos-com-gemini)).
+
+> Se o Metro mostrar `Unable to resolve "expo-document-picker"` (ou
+> `@react-native-async-storage/async-storage`), o `npm install` da raiz não
+> rodou depois de atualizar o projeto. Veja o
+> [Troubleshooting](#unable-to-resolve-expo-document-picker-ou-async-storage).
+
 ---
 
 ## 5. Estrutura do repositório
@@ -217,9 +239,12 @@ studyflow/
 │   │   │   ├── domain/planning/  Algoritmo de planejamento (só a interface)
 │   │   │   ├── middlewares/      Validação, autenticação, erros, 404
 │   │   │   ├── errors/           AppError e os erros HTTP derivados
+│   │   │   ├── integrations/     Clientes de serviços externos (gemini/geminiClient.ts)
+│   │   │   ├── prompts/          Instruções e exemplos do assistente (studyPlanPrompt.ts)
 │   │   │   ├── types/            Tipos e augmentação do Express
 │   │   │   ├── app.ts            Monta o Express (sem abrir porta)
 │   │   │   └── server.ts         Abre a porta e encerra com ordem
+│   │   ├── scripts/              setup-test-db.mjs e gemini-check.mjs (diagnóstico da IA)
 │   │   ├── tests/                Vitest + Supertest
 │   │   └── prisma.config.ts      Configuração da CLI do Prisma
 │   │
@@ -291,6 +316,15 @@ responsabilidade e o que **não** pode entrar nela.
 | `JWT_SECRET` | (gerado, 32+ caracteres) | Assinatura dos tokens |
 | `JWT_EXPIRES_IN` | `7d` | Validade do token |
 | `CORS_ORIGIN` | `*` | Origens permitidas. Em produção, restringir. |
+| `GEMINI_API_KEY` | (gerada no AI Studio) | **Opcional.** Chave do Gemini para o assistente de estudos. Vazia = assistente desligado, resto da API normal. |
+| `GEMINI_MODEL` | `gemini-flash-lite-latest` | Modelo principal. Qual responde melhor para a sua chave: `npm run gemini:check`. |
+| `GEMINI_FALLBACK_MODELS` | `gemini-flash-latest` | Modelos reserva, separados por vírgula, usados quando o principal está sobrecarregado ou sem cota. |
+| `GEMINI_THINKING_LEVEL` | `low` | Quanto o modelo "pensa": `minimal`, `low`, `medium`, `high` ou `default`. `low` mantém as respostas em segundos. |
+| `GEMINI_TIMEOUT_SECONDS` | `60` | Tempo máximo de uma tentativa no Gemini. |
+| `GEMINI_TOTAL_TIMEOUT_SECONDS` | `150` | Prazo total de uma mensagem, somando novas tentativas e o modelo reserva. |
+
+> A chave do Gemini é segredo: nunca vai para o app (`EXPO_PUBLIC_`) nem para
+> o git. Se ela vazar (print, chat, commit), apague-a no AI Studio e gere outra.
 
 ### `apps/mobile/.env`
 
@@ -347,6 +381,11 @@ npm run dev:api
 ```
 
 Pronto. O `migrate deploy` embutido no `dev:api` resolve.
+
+> Se a atualização trouxe mudança no `schema.prisma` (como a tabela
+> `ai_study_plans`, do assistente), rode também `npm run db:generate` antes do
+> `dev:api`, para o client do Prisma conhecer o modelo novo. O `npm install`
+> já faz isso, mas só quando instala alguma coisa.
 
 ### Outros comandos
 
@@ -477,6 +516,7 @@ Windows.
 | `npm run db:generate` | Regenera o client do Prisma |
 | `npm run db:studio` | Abre o Prisma Studio |
 | `npm run db:logs` | Acompanha os logs do PostgreSQL |
+| `npm run gemini:check` | Diagnóstico do Gemini: chave, conexão, modelos liberados, tempo de resposta e o que pôr no `.env` |
 | `npm run typecheck` | Verifica tipos nos três workspaces |
 | `npm test` | Roda os testes da API |
 | `npm run test:watch` | Testes em modo watch |
@@ -505,6 +545,10 @@ depende do banco fica mockado.
 | `tests/AuthRoutes.test.ts` | Contrato das três rotas de auth, `422` com `issues`, `401` sem Bearer e `passwordHash` ausente de toda resposta. |
 | `tests/passwordPolicy.test.ts` | A política de senha aceita o que deve aceitar e recusa o que falta maiúscula, minúscula, caractere especial ou tamanho; o que falta vira uma mensagem só; o login não aplica a política. |
 | `tests/RateLimitMiddleware.test.ts` | A janela deslizante libera dentro do limite e devolve `429` ao estourar. |
+| `tests/AiRoutes.test.ts` | Chat do assistente: multipart com e sem arquivo, PDF enviado como `octet-stream` reconhecido pela extensão, `.docx` recusado com `400`, `422` quando a última mensagem não é da pessoa, `401` sem Bearer. |
+| `tests/AiStudyPlanService.test.ts` | Com o Gemini mockado: o arquivo é anexado à última mensagem com o contexto do app (disponibilidade e matérias); o plano é normalizado (dias em ordem, total recalculado); resposta fora do formato vira texto sem quebrar. |
+| `tests/geminiClient.test.ts` | Com o `fetch` mockado: upload resumível, novas tentativas em `503`, troca para o modelo reserva em tempo esgotado e `429`, repetição sem `thinkingLevel` quando o modelo recusa, modelo travado evitado por 5 min, chave inválida sem novas tentativas. |
+| `tests/SavedStudyPlanRoutes.test.ts` / `SavedStudyPlanService.test.ts` | `GET/PUT/DELETE /ai/study-plan`: valida o plano, salva por dono, `204` ao remover; registro antigo incompatível vira `plan: null`. |
 
 ### Com banco de verdade
 
@@ -554,6 +598,25 @@ Regras que sustentam isso:
   ler dado de outra pessoa.
 - **O algoritmo de planejamento não toca no banco.** Ele recebe dados prontos
   e devolve atividades e conflitos — por isso é testável sem infraestrutura.
+
+### Assistente com IA — fluxo de uma mensagem
+
+```
+app (chat) ─ multipart: histórico + arquivo ─▶ POST /ai/study-plan/chat
+                                               ├─ sobe o arquivo na Files API do Gemini (1x)
+                                               ├─ lê disponibilidade e matérias da pessoa
+                                               ├─ prompt + exemplos + histórico → Gemini (JSON obrigatório)
+                                               └─ novas tentativas / modelo reserva se o Google falhar
+app ◀── { reply, studyPlan, attachment } ───────┘
+```
+
+- **A chave do Gemini só existe no backend.** O app fala com a nossa API,
+  autenticada por JWT; a API fala com o Google.
+- **A API não guarda a conversa.** O app envia o histórico a cada mensagem; o
+  arquivo sobe uma vez e depois só a referência circula (o Google o mantém
+  por 48 h).
+- **O plano aplicado vai para o banco** (`ai_study_plans`, um por pessoa) e os
+  **anteriores ficam no aparelho** (AsyncStorage), para a aba Matérias.
 
 ### Mobile
 
@@ -643,6 +706,23 @@ Nomes de arquivo e organização de pastas:
   sessões dela; a matéria só sai depois que as avaliações saem, e a recusa
   vem com a razão em vez de um erro seco.
 
+**Assistente de estudos com Gemini:**
+
+- Botão flutuante com o ícone do Gemini em todas as telas logadas, abrindo um
+  chat em tela cheia. A caixa de texto sobe junto com o teclado (Android e iOS).
+- Envio do plano de aulas (PDF, imagem ou texto, até 15 MB). O Gemini monta
+  um plano semanal com matérias, prioridade, tempo por matéria, conteúdos,
+  sessões por dia e dicas, respeitando a disponibilidade cadastrada no app.
+  Dá para pedir ajustes na conversa ("tira o sábado").
+- **Aplicar plano nas Matérias**: cadastra as matérias que faltam e guarda o
+  plano. Na aba Matérias aparecem o resumo do plano e, em cada matéria, o
+  tempo semanal, a prioridade e o que estudar; ao abrir a matéria, o quadro
+  "O que estudar" mostra os conteúdos e os dias da semana.
+- Planos anteriores ficam no aparelho: a matéria que o plano novo não cobre
+  continua com as indicações do plano em que aparecia.
+- Resiliência ao plano gratuito do Google: novas tentativas, modelo reserva e
+  diagnóstico com `npm run gemini:check`.
+
 ### O que ainda não existe
 
 **Interface**
@@ -666,7 +746,9 @@ Nomes de arquivo e organização de pastas:
 
 **Integrações**
 - Busca de conteúdo no YouTube ou na internet.
-- Qualquer integração com IA (Gemini ou outra).
+- As sessões do plano da IA não entram no calendário automaticamente: o
+  plano aparece na aba Matérias como recomendação, e o calendário continua
+  sendo montado pelas provas, conteúdos e disponibilidade cadastrados.
 - Qualquer API externa.
 
 **Testes**
@@ -770,3 +852,110 @@ npm warn install-scripts 3 packages have install scripts not yet covered by allo
 
 É um aviso de segurança do npm 11, não um erro. O projeto instala e roda
 normalmente — esses scripts não são necessários aqui. Pode ignorar.
+
+### `Unable to resolve "expo-document-picker"` (ou async-storage)
+
+O pacote está no `package.json` mas não foi baixado. Na **raiz** do projeto:
+
+```bash
+npm install
+npm ls expo-document-picker @react-native-async-storage/async-storage
+```
+
+Os dois precisam aparecer com versão. Depois reinicie o Metro limpando o cache
+(`npx expo start -c` dentro de `apps/mobile`). Se persistir, rode
+`npx expo install expo-document-picker @react-native-async-storage/async-storage`
+dentro de `apps/mobile` e de novo `npm install` na raiz. Os dois já vêm no Expo
+Go: não precisa de build nativo.
+
+### O assistente diz que "ainda não foi configurado"
+
+`GEMINI_API_KEY` está vazia em `apps/api/.env`. Preencha e reinicie a API.
+
+### O assistente demora, dá "sobrecarregados" ou "demorou demais"
+
+É o plano gratuito do Google sem capacidade naquele momento
+(`503 UNAVAILABLE ... high demand` no terminal da API). A API já tenta de novo
+e troca para o modelo reserva sozinha. Se acontecer sempre:
+
+```bash
+npm run gemini:check
+```
+
+Ele testa os modelos liberados para a sua chave e diz qual colocar em
+`GEMINI_MODEL` e `GEMINI_FALLBACK_MODELS`. As linhas `[gemini]` no terminal da
+API mostram cada tentativa e qual modelo respondeu.
+
+### "O limite gratuito do Gemini foi atingido"
+
+Cota por minuto ou por dia da chave gratuita (`429`). Espere alguns minutos
+(ou até o dia seguinte). Ter um modelo reserva ajuda, porque cada modelo tem a
+sua cota.
+
+### "Formato não suportado" ao anexar o plano de aulas
+
+O Gemini não lê Word. Salve o `.docx` como PDF e envie de novo. Formatos
+aceitos: PDF, PNG, JPG, WEBP, HEIC, TXT, MD e CSV.
+
+### A matéria não mostra o que estudar
+
+A correspondência entre o plano e a matéria é pelo **nome** (sem diferenciar
+maiúsculas nem acentos). Se o plano chama a matéria de "Cálculo Diferencial" e
+o app de "Cálculo I", eles não se encontram: renomeie a matéria no app ou peça
+ao assistente para usar o mesmo nome e aplique o plano de novo.
+
+
+---
+
+## 15. Assistente de estudos com Gemini
+
+### Ativar
+
+1. Gere a chave em [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
+2. Preencha `GEMINI_API_KEY` em `apps/api/.env` (as demais variáveis
+   `GEMINI_*` já vêm com valores bons; veja a [seção 6](#6-variáveis-de-ambiente-e-segredos)).
+3. Na raiz: `npm install`, `npm run db:generate` e `npm run dev:api` (aplica a
+   migration `ai_study_plans` sozinho).
+4. Confira: `npm run gemini:check`.
+
+### Usar
+
+1. No app, toque no botão do Gemini (canto inferior direito).
+2. Toque no clipe 📎 e envie o plano de aulas. Pode escrever junto uma
+   observação ("tenho mais dificuldade em Física").
+3. O assistente responde com um cartão do plano: matérias com prioridade e
+   horas por semana, a semana dia a dia e dicas. Peça ajustes na conversa.
+4. Toque em **Aplicar plano nas Matérias**. As matérias que faltam são
+   cadastradas e o plano aparece na aba Matérias.
+5. "Nova conversa" (ícone de seta circular) recomeça o chat. **Remover plano
+   da IA**, na aba Matérias, apaga o plano atual e o histórico do aparelho;
+   as matérias continuam.
+
+### Onde mexer
+
+| Quero… | Arquivo |
+|---|---|
+| Mudar o comportamento da IA (regras, tom, exemplos) | `apps/api/src/prompts/studyPlanPrompt.ts` |
+| Mudar novas tentativas, prazos e modelo reserva | `apps/api/src/integrations/gemini/geminiClient.ts` e `.env` |
+| Mudar o formato do plano | `packages/shared/src/types/aiStudyPlan.ts` + schema no prompt + `_studyPlanCard.tsx` |
+| Mudar o chat | `apps/mobile/src/views/studyAssistant/` e `controllers/studyAssistant/` |
+| Mudar como o plano aparece nas Matérias | `apps/mobile/src/views/subjects/_aiPlanCard.tsx`, `_aiGuidance.tsx`, `_subjectRow.tsx` |
+
+### Endpoints
+
+| Método e rota | O que faz |
+|---|---|
+| `POST /ai/study-plan/chat` | `multipart/form-data`: `payload` (JSON com o histórico) e `file` opcional. Limite de 30 mensagens a cada 10 min por IP. |
+| `GET /ai/study-plan` | Plano aplicado pela pessoa, ou `{ plan: null }`. |
+| `PUT /ai/study-plan` | Guarda (ou substitui) o plano aplicado. |
+| `DELETE /ai/study-plan` | Remove o plano aplicado (as matérias ficam). |
+
+Todas exigem login.
+
+### Como treinar o assistente
+
+Não é preciso *fine-tuning*: o comportamento se ajusta em
+`apps/api/src/prompts/studyPlanPrompt.ts`, com regras concretas na instrução
+de sistema e, principalmente, exemplos de pergunta e resposta ideal. O passo a
+passo, a arquitetura completa, limites e custos do plano gratuito estão em
+[`docs/assistente-gemini.md`](docs/assistente-gemini.md).

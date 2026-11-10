@@ -69,3 +69,13 @@ export class TooManyRequestsError extends AppError {
     super(message, 429, 'TOO_MANY_REQUESTS');
   }
 }
+
+/**
+ * 503 — um serviço externo de que a rota depende está fora ou não foi
+ * configurado (ex.: a chave do Gemini ausente no .env).
+ */
+export class ServiceUnavailableError extends AppError {
+  constructor(message = 'Serviço temporariamente indisponível. Tente de novo em instantes.') {
+    super(message, 503, 'SERVICE_UNAVAILABLE');
+  }
+}
