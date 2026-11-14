@@ -17,7 +17,8 @@ import {
   type StudyAssistantController,
 } from '@/controllers/studyAssistant/StudyAssistantController';
 import { useKeyboardOverlap } from '@/hooks/useKeyboardOverlap';
-import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 import { Composer } from './_composer';
 import { MessageBubble } from './_messageBubble';
@@ -36,6 +37,8 @@ type StudyAssistantProps = {
  * dele para a conversa sobreviver a um fechar-e-abrir.
  */
 export default function StudyAssistant({ controller, onClose }: StudyAssistantProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const insets = useSafeAreaInsets();
   const rolagem = useRef<ScrollViewInstance>(null);
   const tela = useRef<ViewInstance>(null);
@@ -56,15 +59,15 @@ export default function StudyAssistant({ controller, onClose }: StudyAssistantPr
   return (
     <View
       ref={tela}
-      style={[styles.tela, { paddingTop: insets.top, paddingBottom: teclado }]}
+      style={[styles.tela, { backgroundColor: palette.canvas, paddingTop: insets.top, paddingBottom: teclado }]}
     >
       {/* Cabeçalho */}
-      <View style={styles.cabecalho}>
+      <View style={[styles.cabecalho, { backgroundColor: palette.surface, borderBottomColor: palette.border }]}>
         <View style={styles.marca}>
           <GeminiIcon size={26} />
           <View>
-            <Text style={styles.titulo}>Assistente de estudos</Text>
-            <Text style={styles.subtitulo}>com Gemini</Text>
+            <Text style={[styles.titulo, { color: palette.ink }]}>Assistente de estudos</Text>
+            <Text style={[styles.subtitulo, { color: palette.textMuted }]}>com Gemini</Text>
           </View>
         </View>
         <View style={styles.acoesTopo}>
@@ -76,7 +79,7 @@ export default function StudyAssistant({ controller, onClose }: StudyAssistantPr
               accessibilityRole="button"
               accessibilityLabel="Nova conversa"
             >
-              <RotateCcwIcon size={20} color={colors.textMuted} />
+              <RotateCcwIcon size={20} color={palette.textMuted} />
             </Pressable>
           )}
           <Pressable
@@ -85,7 +88,7 @@ export default function StudyAssistant({ controller, onClose }: StudyAssistantPr
             accessibilityRole="button"
             accessibilityLabel="Fechar assistente"
           >
-            <XIcon size={22} color={colors.ink} />
+            <XIcon size={22} color={palette.ink} />
           </Pressable>
         </View>
       </View>
@@ -100,11 +103,11 @@ export default function StudyAssistant({ controller, onClose }: StudyAssistantPr
       >
         {vazia ? (
           <View style={styles.boasVindas}>
-            <View style={styles.boasVindasIcone}>
+            <View style={[styles.boasVindasIcone, { backgroundColor: palette.surface, borderColor: palette.border }]}>
               <GeminiIcon size={40} />
             </View>
-            <Text style={styles.boasVindasTitulo}>Vamos montar seu plano de estudos?</Text>
-            <Text style={styles.boasVindasTexto}>
+            <Text style={[styles.boasVindasTitulo, { color: palette.ink }]}>Vamos montar seu plano de estudos?</Text>
+            <Text style={[styles.boasVindasTexto, { color: palette.textMuted }]}>
               Toque no clipe 📎 e envie o seu plano de aulas (PDF, foto ou texto). Eu leio as
               matérias, os conteúdos e as datas de prova e monto uma rotina semanal com o tempo
               certo para cada matéria, respeitando a disponibilidade que você cadastrou no app.
@@ -115,10 +118,14 @@ export default function StudyAssistant({ controller, onClose }: StudyAssistantPr
                   key={sugestao}
                   onPress={() => c.send(sugestao)}
                   disabled={c.sending}
-                  style={({ pressed }) => [styles.sugestao, pressed ? styles.pressionado : null]}
+                  style={({ pressed }) => [
+                    styles.sugestao,
+                    { backgroundColor: palette.surface, borderColor: palette.border },
+                    pressed ? styles.pressionado : null,
+                  ]}
                   accessibilityRole="button"
                 >
-                  <Text style={styles.sugestaoTexto}>{sugestao}</Text>
+                  <Text style={[styles.sugestaoTexto, { color: palette.primaryDark }]}>{sugestao}</Text>
                 </Pressable>
               ))}
             </View>
@@ -141,7 +148,7 @@ export default function StudyAssistant({ controller, onClose }: StudyAssistantPr
         {c.sending ? (
           <View style={styles.digitando}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.digitandoTexto}>
+            <Text style={[styles.digitandoTexto, { color: palette.textMuted }]}>
               O Gemini está analisando… se os servidores estiverem cheios, pode levar até 2 minutos.
             </Text>
           </View>
@@ -165,7 +172,7 @@ export default function StudyAssistant({ controller, onClose }: StudyAssistantPr
       <View
         style={{
           paddingBottom: tecladoAberto ? spacing.sm : Math.max(insets.bottom, spacing.md),
-          backgroundColor: colors.surface,
+          backgroundColor: palette.surface,
         }}
       >
         <Composer
@@ -197,8 +204,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
-    borderBottomColor: colors.border,
     borderBottomWidth: 1,
   },
   marca: {
@@ -242,8 +247,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -264,8 +267,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   sugestao: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderWidth: 1,
     borderRadius: radii.control,
     paddingHorizontal: spacing.lg,
@@ -273,7 +274,6 @@ const styles = StyleSheet.create({
   },
   sugestaoTexto: {
     ...typography.label,
-    color: colors.primaryDark,
   },
   pressionado: {
     opacity: 0.7,

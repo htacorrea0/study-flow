@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { FlagIcon } from '@/components/icons';
 import { Card } from '@/components/ui';
-import { colors, radii, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type AssessmentItemProps = {
   readonly assessment: CalendarAssessment;
@@ -22,6 +23,8 @@ const LADO_DO_ICONE = 20;
  * do que uma sessão de estudo que pode ser remarcada.
  */
 export function AssessmentItem({ assessment }: AssessmentItemProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const cor = assessment.subject.color ?? colors.primary;
   const rotulo = assessment.type === 'EXAM' ? 'Prova' : 'Entrega';
 
@@ -32,10 +35,10 @@ export function AssessmentItem({ assessment }: AssessmentItemProps) {
       </View>
 
       <View style={styles.texto}>
-        <Text style={styles.titulo} numberOfLines={1}>
+        <Text style={[styles.titulo, { color: palette.ink }]} numberOfLines={1}>
           {assessment.title}
         </Text>
-        <Text style={styles.subtitulo} numberOfLines={1} ellipsizeMode="tail">
+        <Text style={[styles.subtitulo, { color: palette.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
           {assessment.subject.name}
         </Text>
       </View>

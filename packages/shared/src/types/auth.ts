@@ -35,3 +35,34 @@ export interface AuthResponse {
 export interface MeResponse {
   readonly user: PublicUser;
 }
+
+export interface NotificationPreferences {
+  readonly studyReminderEnabled: boolean;
+  readonly reminderTime: string;
+}
+
+export interface ProfileMetrics {
+  readonly totalStudySeconds: number;
+  readonly streakDays: number;
+}
+
+export interface ProfileResponse {
+  readonly user: PublicUser;
+  readonly notifications: NotificationPreferences;
+  readonly metrics: ProfileMetrics;
+}
+
+export interface UpdateProfileInput {
+  readonly name?: string;
+  readonly email?: string;
+}
+
+export interface UpdatePasswordInput {
+  readonly currentPassword: string;
+  readonly newPassword: string;
+}
+
+export interface UpdateNotificationPreferencesInput {
+  readonly studyReminderEnabled: boolean;
+  readonly reminderTime?: string;
+}

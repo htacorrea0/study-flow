@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, sizes } from '@/theme';
+import { colors, darkColors, sizes } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type ScreenContainerProps = {
   children: ReactNode;
@@ -31,6 +32,7 @@ type ScreenContainerProps = {
  */
 export function ScreenContainer({ children, footer, edgeToEdge = false }: ScreenContainerProps) {
   const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
 
   return (
     <KeyboardAvoidingView
@@ -40,7 +42,15 @@ export function ScreenContainer({ children, footer, edgeToEdge = false }: Screen
       // conteúdo duas vezes.
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.screen,
+          {
+            backgroundColor: isDark ? darkColors.canvas : colors.canvas,
+            paddingTop: insets.top,
+          },
+        ]}
+      >
         <ScrollView
           style={styles.flex}
           contentContainerStyle={[styles.content, edgeToEdge ? styles.contentEdgeToEdge : null]}

@@ -62,3 +62,14 @@ export const colors = {
 } as const;
 
 export type ColorToken = keyof typeof colors;
+
+export const darkColors = {
+  canvas: '#0f172a',
+  surface: '#1e293b',
+  primaryGlow: '#312e81',
+  primaryDark: '#c4b5fd',
+  ink: '#f8fafc',
+  textMuted: '#cbd5e1',
+  textSubtle: '#94a3b8',
+  border: '#475569',
+} as const;

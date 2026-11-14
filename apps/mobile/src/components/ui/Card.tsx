@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radii, spacing } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type CardProps = {
   children: ReactNode;
@@ -22,8 +23,15 @@ type CardProps = {
  * `surface`, borda `border`, padding 16) é igual nos dois.
  */
 export function Card({ children, size = 'default', style }: CardProps) {
+  const { isDark } = useTheme();
+
   return (
-    <View style={[styles.base, size === 'large' ? styles.large : styles.default, style]}>
+    <View style={[
+      styles.base,
+      size === 'large' ? styles.large : styles.default,
+      isDark && styles.dark,
+      style,
+    ]}>
       {children}
     </View>
   );
@@ -41,5 +49,9 @@ const styles = StyleSheet.create({
   },
   large: {
     borderRadius: radii.cardLarge,
+  },
+  dark: {
+    backgroundColor: '#1f2937',
+    borderColor: '#374151',
   },
 });

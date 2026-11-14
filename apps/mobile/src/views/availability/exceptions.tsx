@@ -9,7 +9,8 @@ import {
   TextField,
 } from "@/components/ui";
 import { useAvailabilityController } from "@/controllers/availability/AvailabilityController";
-import { colors, spacing, typography } from "@/theme";
+import { colors, darkColors, spacing, typography } from "@/theme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { ErrorState } from "@/views/_templates/_errorState";
 import { ScreenTopBar } from "@/views/_templates/_screenTopBar";
 import { SkeletonBlock } from "@/views/_templates/_skeletonBlock";
@@ -21,6 +22,8 @@ function dataLegivel(iso: string): string {
 
 export default function AvailabilityExceptions() {
   const controller = useAvailabilityController();
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
 
   if (controller.status === "error") {
     return (
@@ -39,7 +42,7 @@ export default function AvailabilityExceptions() {
   return (
     <ScreenContainer>
       <ScreenTopBar title="Exceções" onBack={controller.goBack}>
-        <Text style={styles.explicacao}>
+        <Text style={[styles.explicacao, { color: palette.textMuted }]}>
           Substitua o tempo habitual em uma data específica, sem alterar sua
           disponibilidade semanal.
         </Text>
@@ -107,14 +110,14 @@ export default function AvailabilityExceptions() {
             />
           ))}
 
-          <Text style={styles.secaoTitulo}>Datas configuradas</Text>
+          <Text style={[styles.secaoTitulo, { color: palette.ink }]}>Datas configuradas</Text>
           {controller.exceptions.map((exception) => (
             <View key={exception.date} style={styles.excecao}>
               <View style={styles.excecaoTexto}>
-                <Text style={styles.excecaoData}>
+                <Text style={[styles.excecaoData, { color: palette.ink }]}>
                   {dataLegivel(exception.date)}
                 </Text>
-                <Text style={styles.apoio}>
+                <Text style={[styles.apoio, { color: palette.textMuted }]}>
                   {exception.minutes} min
                   {exception.reason === null ? "" : ` · ${exception.reason}`}
                 </Text>
@@ -122,7 +125,7 @@ export default function AvailabilityExceptions() {
               <Button
                 icon={Trash2Icon}
                 accessibilityLabel="Remover exceção"
-                variant="danger"
+                variant="secondary"
                 onPress={() => controller.removeException(exception.date)}
                 disabled={controller.exceptionSaving}
               />
@@ -137,6 +140,7 @@ export default function AvailabilityExceptions() {
 const styles = StyleSheet.create({
   explicacao: {
     ...typography.screenSubtitle,
+    color: colors.textMuted,
     marginBottom: spacing.md,
   },
   lista: {
@@ -152,8 +156,6 @@ const styles = StyleSheet.create({
   },
   excecao: {
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: 12,
     borderWidth: 1,
     flexDirection: "row",

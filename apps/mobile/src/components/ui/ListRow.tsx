@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChevronRightIcon, type IconProps } from '@/components/icons';
 import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type ListRowProps = {
   readonly title: string;
@@ -35,12 +36,18 @@ export function ListRow({
   onPress,
   showChevron = true,
 }: ListRowProps) {
+  const { isDark } = useTheme();
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={subtitle === undefined ? title : `${title}. ${subtitle}`}
-      style={({ pressed }) => [styles.linha, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [
+        styles.linha,
+        isDark && styles.linhaEscura,
+        pressed ? styles.pressed : null,
+      ]}
     >
       {Icon === undefined ? (
         <View
@@ -54,10 +61,12 @@ export function ListRow({
       )}
 
       <View style={styles.textos}>
-        <Text style={styles.titulo} numberOfLines={1}>
+        <Text style={[styles.titulo, isDark && styles.textoClaro]} numberOfLines={1}>
           {title}
         </Text>
-        {subtitle === undefined ? null : <Text style={styles.apoio}>{subtitle}</Text>}
+        {subtitle === undefined ? null : (
+          <Text style={[styles.apoio, isDark && styles.apoioEscuro]}>{subtitle}</Text>
+        )}
       </View>
 
       {showChevron ? <ChevronRightIcon size={sizes.inputIcon} color={colors.textSubtle} /> : null}
@@ -95,5 +104,15 @@ const styles = StyleSheet.create({
   },
   apoio: {
     ...typography.caption,
+  },
+  linhaEscura: {
+    backgroundColor: '#1f2937',
+    borderColor: '#374151',
+  },
+  textoClaro: {
+    color: '#f8fafc',
+  },
+  apoioEscuro: {
+    color: '#cbd5e1',
   },
 });

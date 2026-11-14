@@ -13,7 +13,8 @@ import {
   type IconProps,
 } from '@/components/icons';
 import { Card } from '@/components/ui';
-import { colors, radii, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { withOpacity } from '@/utils/color';
 
 type SessionItemProps = {
@@ -87,6 +88,8 @@ export function prazoLegivel(tipo: Session['assessmentType'], dias: number): str
  * a mesma tipografia e o mesmo alinhamento.
  */
 export function SessionItem({ session }: SessionItemProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const concluida = session.status === 'DONE';
   const emAndamento = session.status === 'IN_PROGRESS';
 
@@ -101,19 +104,26 @@ export function SessionItem({ session }: SessionItemProps) {
       </View>
 
       <View style={styles.texto}>
-        <Text style={[styles.titulo, concluida && styles.tituloConcluido]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.titulo,
+            { color: palette.ink },
+            concluida && { color: palette.textMuted },
+          ]}
+          numberOfLines={1}
+        >
           {session.title}
         </Text>
-        <Text style={styles.subtitulo} numberOfLines={1} ellipsizeMode="tail">
+        <Text style={[styles.subtitulo, { color: palette.textMuted }]} numberOfLines={1} ellipsizeMode="tail">
           {`${session.subject.name} · ${session.assessmentTitle}`}
         </Text>
       </View>
 
       <View style={styles.badge}>
-        <Text style={[styles.duracao, concluida && styles.duracaoConcluida]}>
+        <Text style={[styles.duracao, { color: isDark ? '#a5b4fc' : colors.primary }, concluida && { color: palette.textMuted }]}>
           {`${session.estimatedMinutes} min`}
         </Text>
-        <Text style={[styles.prazo, emAndamento && styles.prazoEmAndamento]}>
+        <Text style={[styles.prazo, { color: palette.textSubtle }, emAndamento && { color: isDark ? '#a5b4fc' : colors.primary }]}>
           {legendaDoEstado(session)}
         </Text>
       </View>

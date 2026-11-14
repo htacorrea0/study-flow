@@ -1,6 +1,7 @@
 import { Modal, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 import { Button } from './Button';
 
@@ -40,6 +41,8 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { isDark } = useTheme();
+
   return (
     <Modal
       visible={visible}
@@ -49,9 +52,9 @@ export function ConfirmDialog({
       accessibilityViewIsModal
     >
       <View style={styles.fundo}>
-        <View style={styles.caixa} accessibilityRole="alert">
-          <Text style={styles.titulo}>{title}</Text>
-          <Text style={styles.mensagem}>{message}</Text>
+        <View style={[styles.caixa, isDark && styles.caixaEscura]} accessibilityRole="alert">
+          <Text style={[styles.titulo, isDark && styles.textoClaro]}>{title}</Text>
+          <Text style={[styles.mensagem, isDark && styles.subtituloEscuro]}>{message}</Text>
 
           <View style={styles.acoes}>
             <Button
@@ -99,5 +102,16 @@ const styles = StyleSheet.create({
   acoes: {
     gap: spacing.md,
     marginTop: spacing.sm,
+  },
+  caixaEscura: {
+    backgroundColor: '#1f2937',
+    borderColor: '#374151',
+    borderWidth: 1,
+  },
+  textoClaro: {
+    color: '#f8fafc',
+  },
+  subtituloEscuro: {
+    color: '#cbd5e1',
   },
 });

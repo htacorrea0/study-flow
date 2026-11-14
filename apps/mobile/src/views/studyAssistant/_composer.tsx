@@ -2,7 +2,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 
 import { FileTextIcon, PaperclipIcon, SendIcon, XIcon } from '@/components/icons';
 import type { PickedFile } from '@/services/ai/AiStudyPlanService';
-import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type ComposerProps = {
   readonly draft: string;
@@ -38,16 +39,19 @@ export function Composer({
   onRemoveFile,
   onSend,
 }: ComposerProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
-    <View style={styles.rodape}>
+    <View style={[styles.rodape, { backgroundColor: palette.surface, borderTopColor: palette.border }]}>
       {pendingFile ? (
-        <View style={styles.chip}>
-          <FileTextIcon size={18} color={colors.primary} />
+        <View style={[styles.chip, { backgroundColor: palette.primaryGlow }]}>
+          <FileTextIcon size={18} color={isDark ? palette.primaryDark : colors.primary} />
           <View style={styles.chipTextos}>
-            <Text style={styles.chipNome} numberOfLines={1}>
+            <Text style={[styles.chipNome, { color: palette.ink }]} numberOfLines={1}>
               {pendingFile.name}
             </Text>
-            <Text style={styles.chipTamanho}>{tamanho(pendingFile.size)}</Text>
+            <Text style={[styles.chipTamanho, { color: palette.textMuted }]}>{tamanho(pendingFile.size)}</Text>
           </View>
           <Pressable
             onPress={onRemoveFile}
@@ -56,7 +60,7 @@ export function Composer({
             accessibilityRole="button"
             accessibilityLabel="Remover arquivo"
           >
-            <XIcon size={18} color={colors.textMuted} />
+            <XIcon size={18} color={palette.textMuted} />
           </Pressable>
         </View>
       ) : null}
@@ -65,19 +69,23 @@ export function Composer({
         <Pressable
           onPress={onPickFile}
           disabled={sending}
-          style={({ pressed }) => [styles.botaoIcone, pressed ? styles.pressionado : null]}
+          style={({ pressed }) => [
+            styles.botaoIcone,
+            { backgroundColor: palette.primaryGlow },
+            pressed ? styles.pressionado : null,
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Anexar plano de aulas"
         >
-          <PaperclipIcon size={20} color={colors.primary} />
+          <PaperclipIcon size={20} color={isDark ? palette.primaryDark : colors.primary} />
         </Pressable>
 
         <TextInput
           value={draft}
           onChangeText={onChangeDraft}
           placeholder={pendingFile ? 'Adicione uma observação (opcional)' : 'Pergunte ou envie seu plano de aulas'}
-          placeholderTextColor={colors.textSubtle}
-          style={styles.campo}
+          placeholderTextColor={palette.textSubtle}
+          style={[styles.campo, { backgroundColor: palette.canvas, borderColor: palette.border, color: palette.ink }]}
           multiline
           maxLength={4000}
           editable={!sending}
@@ -109,8 +117,6 @@ export function Composer({
 
 const styles = StyleSheet.create({
   rodape: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
     borderTopWidth: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,

@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Banner, Button, Card, Checkbox } from '@/components/ui';
 import { useDayConfirmationController } from '@/controllers/calendar/DayConfirmationController';
-import { colors, spacing, typography } from '@/theme';
+import { colors, darkColors, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import type { IsoDate } from '@/utils/date';
 
 type ConfirmationPanelProps = {
@@ -24,6 +25,8 @@ type ConfirmationPanelProps = {
  * não cabe, o aviso diz isso em vez de o conteúdo sumir em silêncio.
  */
 export function ConfirmationPanel({ date, today, sessions, onConfirmed }: ConfirmationPanelProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const controller = useDayConfirmationController({ date, today, sessions, onConfirmed });
 
   if (!controller.visible) {
@@ -32,7 +35,7 @@ export function ConfirmationPanel({ date, today, sessions, onConfirmed }: Confir
 
   return (
     <Card size="large" style={styles.cartao}>
-      <Text style={styles.titulo}>O que você estudou?</Text>
+      <Text style={[styles.titulo, { color: palette.ink }]}>O que você estudou?</Text>
 
       <Checkbox
         label="Marcar todas"
@@ -42,7 +45,7 @@ export function ConfirmationPanel({ date, today, sessions, onConfirmed }: Confir
         disabled={controller.submitting}
       />
 
-      <View style={styles.divisor} />
+      <View style={[styles.divisor, { backgroundColor: palette.border }]} />
 
       {sessions.map((session) => (
         <Checkbox

@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GeminiIcon } from '@/components/icons';
 import { useStudyAssistantController } from '@/controllers/studyAssistant/StudyAssistantController';
-import { colors, spacing } from '@/theme';
+import { colors, darkColors, spacing } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 import StudyAssistant from './studyAssistant';
 
@@ -21,6 +22,8 @@ const LADO_DO_BOTAO = 58;
  */
 export function AssistantLauncher() {
   const insets = useSafeAreaInsets();
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const [aberto, setAberto] = useState(false);
   const controller = useStudyAssistantController();
 
@@ -32,7 +35,11 @@ export function AssistantLauncher() {
       >
         <Pressable
           onPress={() => setAberto(true)}
-          style={({ pressed }) => [styles.botao, pressed ? styles.pressionado : null]}
+          style={({ pressed }) => [
+            styles.botao,
+            { backgroundColor: palette.surface, borderColor: palette.border, shadowColor: palette.primaryDark },
+            pressed ? styles.pressionado : null,
+          ]}
           accessibilityRole="button"
           accessibilityLabel="Abrir assistente de estudos com Gemini"
         >

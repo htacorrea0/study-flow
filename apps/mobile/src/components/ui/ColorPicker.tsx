@@ -1,7 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CheckIcon, XIcon } from '@/components/icons';
-import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type ColorPickerProps = {
   readonly label: string;
@@ -28,9 +29,12 @@ const AMOSTRAS: readonly string[] = [
 const AMOSTRA = 40;
 
 export function ColorPicker({ label, value, onChange }: ColorPickerProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <View style={styles.grupo}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: palette.ink }]}>{label}</Text>
 
       <View style={styles.fileira}>
         {AMOSTRAS.map((cor) => {

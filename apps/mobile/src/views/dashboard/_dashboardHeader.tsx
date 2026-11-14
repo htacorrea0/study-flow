@@ -1,13 +1,15 @@
 import type { DashboardUser } from '@study-flow/shared';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FlameIcon } from '@/components/icons';
 import { Avatar } from '@/components/ui';
-import { colors, fontFamilies, radii, spacing, typography } from '@/theme';
+import { colors, darkColors, fontFamilies, radii, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type DashboardHeaderProps = {
   readonly user: DashboardUser;
   readonly streakDays: number;
+  readonly onProfile: () => void;
 };
 
 const LADO_DO_ICONE = 16;
@@ -19,16 +21,25 @@ const LADO_DO_ICONE = 16;
  * destaque cobra em vez de informar, e quem acabou de criar a conta veria
  * isso na primeira tela.
  */
-export function DashboardHeader({ user, streakDays }: DashboardHeaderProps) {
+export function DashboardHeader({ user, streakDays, onProfile }: DashboardHeaderProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const diaOuDias = streakDays === 1 ? 'dia' : 'dias';
 
   return (
     <View style={styles.header}>
       <View style={styles.identidade}>
-        <Avatar initials={user.initials} name={user.name} />
+        <Pressable
+          onPress={onProfile}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir perfil"
+          style={({ pressed }) => (pressed ? styles.pressed : null)}
+        >
+          <Avatar initials={user.initials} name={user.name} />
+        </Pressable>
         <View style={styles.nomes}>
-          <Text style={styles.saudacao}>Bem-vindo!</Text>
-          <Text style={styles.nome} numberOfLines={1}>
+          <Text style={[styles.saudacao, isDark && styles.subtituloEscuro]}>Bem-vindo!</Text>
+          <Text style={[styles.nome, { color: palette.primaryDark }]} numberOfLines={1}>
             {user.name}
           </Text>
         </View>
@@ -36,12 +47,12 @@ export function DashboardHeader({ user, streakDays }: DashboardHeaderProps) {
 
       {streakDays > 0 ? (
         <View
-          style={styles.badge}
+          style={[styles.badge, isDark && styles.badgeEscuro]}
           accessible
           accessibilityLabel={`Sequência de ${streakDays} ${diaOuDias} estudando`}
         >
           <FlameIcon size={LADO_DO_ICONE} color={colors.rose} />
-          <Text style={styles.badgeTexto}>{`${streakDays} ${diaOuDias}`}</Text>
+          <Text style={[styles.badgeTexto, isDark && styles.textoClaro]}>{`${streakDays} ${diaOuDias}`}</Text>
         </View>
       ) : null}
     </View>
@@ -88,5 +99,17 @@ const styles = StyleSheet.create({
   badgeTexto: {
     ...typography.badgeStrong,
     color: colors.rose,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  badgeEscuro: {
+    backgroundColor: '#4c1d32',
+  },
+  textoClaro: {
+    color: '#f8fafc',
+  },
+  subtituloEscuro: {
+    color: '#cbd5e1',
   },
 });

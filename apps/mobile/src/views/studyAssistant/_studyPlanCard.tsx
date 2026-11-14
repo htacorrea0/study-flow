@@ -4,7 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/ui';
 import { CalendarIcon, ClockIcon, ZapIcon } from '@/components/icons';
 import type { SaveSubjectsState } from '@/controllers/studyAssistant/StudyAssistantController';
-import { colors, fontFamilies, radii, spacing, typography } from '@/theme';
+import { colors, darkColors, fontFamilies, radii, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { formatStudyDuration } from '@/utils/duration';
 import { withOpacity } from '@/utils/color';
 
@@ -43,21 +44,24 @@ function minutos(total: number): string {
  * cada uma.
  */
 export function StudyPlanCard({ plan, saveState, onApply }: StudyPlanCardProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.border }]}>
       <View style={styles.topo}>
-        <Text style={styles.titulo}>{plan.title}</Text>
-        {plan.summary ? <Text style={styles.resumo}>{plan.summary}</Text> : null}
+        <Text style={[styles.titulo, { color: palette.ink }]}>{plan.title}</Text>
+        {plan.summary ? <Text style={[styles.resumo, { color: palette.textMuted }]}>{plan.summary}</Text> : null}
 
         <View style={styles.metricas}>
           <View style={styles.metrica}>
-            <ClockIcon size={14} color={colors.primary} />
-            <Text style={styles.metricaTexto}>{minutos(plan.totalWeeklyMinutes)} / semana</Text>
+            <ClockIcon size={14} color={isDark ? palette.primaryDark : colors.primary} />
+            <Text style={[styles.metricaTexto, { color: palette.textMuted }]}>{minutos(plan.totalWeeklyMinutes)} / semana</Text>
           </View>
           {plan.durationWeeks ? (
             <View style={styles.metrica}>
-              <CalendarIcon size={14} color={colors.primary} />
-              <Text style={styles.metricaTexto}>{plan.durationWeeks} semanas</Text>
+              <CalendarIcon size={14} color={isDark ? palette.primaryDark : colors.primary} />
+              <Text style={[styles.metricaTexto, { color: palette.textMuted }]}>{plan.durationWeeks} semanas</Text>
             </View>
           ) : null}
         </View>

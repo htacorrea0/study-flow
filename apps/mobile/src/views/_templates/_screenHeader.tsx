@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type ScreenHeaderProps = {
   readonly title: string;
@@ -15,10 +16,12 @@ type ScreenHeaderProps = {
  * gramática das telas e não é uma peça genérica de interface.
  */
 export function ScreenHeader({ title, subtitle }: ScreenHeaderProps) {
+  const { isDark } = useTheme();
+
   return (
     <View style={styles.header}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
+      <Text style={[styles.title, isDark && styles.textoClaro]}>{title}</Text>
+      <Text style={[styles.subtitle, isDark && styles.subtituloEscuro]}>{subtitle}</Text>
     </View>
   );
 }
@@ -33,5 +36,11 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...typography.screenSubtitle,
+  },
+  textoClaro: {
+    color: '#f8fafc',
+  },
+  subtituloEscuro: {
+    color: '#cbd5e1',
   },
 });

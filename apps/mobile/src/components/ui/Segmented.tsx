@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type SegmentedOption<T extends string> = {
   readonly value: T;
@@ -30,11 +31,13 @@ export function Segmented<T extends string>({
   value,
   onChange,
 }: SegmentedProps<T>) {
+  const { isDark } = useTheme();
+
   return (
     <View style={styles.grupo}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, isDark && styles.textoClaro]}>{label}</Text>
 
-      <View style={styles.trilho} accessibilityRole="radiogroup">
+      <View style={[styles.trilho, isDark && styles.trilhoEscuro]} accessibilityRole="radiogroup">
         {options.map((option) => {
           const selecionada = option.value === value;
 
@@ -51,7 +54,11 @@ export function Segmented<T extends string>({
                 pressed ? styles.pressed : null,
               ]}
             >
-              <Text style={[styles.texto, selecionada ? styles.textoSelecionado : null]}>
+              <Text style={[
+                styles.texto,
+                isDark && styles.textoClaro,
+                selecionada ? styles.textoSelecionado : null,
+              ]}>
                 {option.label}
               </Text>
             </Pressable>
@@ -97,5 +104,12 @@ const styles = StyleSheet.create({
   },
   textoSelecionado: {
     color: colors.white,
+  },
+  trilhoEscuro: {
+    backgroundColor: '#1f2937',
+    borderColor: '#374151',
+  },
+  textoClaro: {
+    color: '#f8fafc',
   },
 });

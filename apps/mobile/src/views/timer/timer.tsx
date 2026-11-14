@@ -19,7 +19,8 @@ import {
   Segmented,
 } from "@/components/ui";
 import { useTimerController } from "@/controllers/timer/TimerController";
-import { colors, radii, sizes, spacing, typography } from "@/theme";
+import { colors, darkColors, radii, sizes, spacing, typography } from "@/theme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { formatStudyDuration } from "@/utils/duration";
 
 /** Atalhos de duração. A digitação direta cobre qualquer outro valor. */
@@ -46,11 +47,13 @@ const MODE_OPTIONS = [
 export default function Timer() {
   const controller = useTimerController();
   const [infoVisible, setInfoVisible] = useState(false);
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
 
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <Text style={styles.title}>Timer</Text>
+        <Text style={[styles.title, { color: palette.ink }]}>Timer</Text>
         <Pressable
           onPress={() => setInfoVisible(true)}
           accessibilityRole="button"
@@ -61,7 +64,7 @@ export default function Timer() {
             pressed ? styles.infoPressed : null,
           ]}
         >
-          <InfoIcon size={22} color={colors.primary} />
+          <InfoIcon size={22} color={isDark ? darkColors.primaryDark : colors.primary} />
         </Pressable>
       </View>
 
@@ -92,7 +95,7 @@ export default function Timer() {
       />
 
       <View style={styles.subjectSection}>
-        <Text style={styles.subjectLabel}>Matéria em foco</Text>
+        <Text style={[styles.subjectLabel, { color: palette.ink }]}>Matéria em foco</Text>
 
         {controller.subjectLoadStatus === "error" ? (
           <Text style={styles.subjectError}>{controller.subjectError}</Text>
@@ -121,12 +124,14 @@ export default function Timer() {
                   accessibilityState={{ selected, checked: selected }}
                   style={[
                     styles.subjectChip,
+                    { backgroundColor: palette.surface, borderColor: palette.border },
                     selected ? styles.subjectChipSelected : null,
                   ]}
                 >
                   <Text
                     style={[
                       styles.subjectChipLabel,
+                      { color: palette.ink },
                       selected ? styles.subjectChipLabelSelected : null,
                     ]}
                   >
@@ -213,6 +218,9 @@ type InfoDialogProps = {
 
 /** Pop-up de explicação aberto pelo ícone ⓘ. */
 function InfoDialog({ visible, title, message, onClose }: InfoDialogProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <Modal
       visible={visible}
@@ -222,9 +230,9 @@ function InfoDialog({ visible, title, message, onClose }: InfoDialogProps) {
       accessibilityViewIsModal
     >
       <View style={styles.infoBackdrop}>
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>{title}</Text>
-          <Text style={styles.infoMessage}>{message}</Text>
+        <View style={[styles.infoBox, { backgroundColor: palette.surface }]}>
+          <Text style={[styles.infoTitle, { color: palette.ink }]}>{title}</Text>
+          <Text style={[styles.infoMessage, { color: palette.textMuted }]}>{message}</Text>
           <Button label="Entendi" onPress={onClose} />
         </View>
       </View>
@@ -253,6 +261,8 @@ function DurationEntry({
   editable,
   onChange,
 }: DurationEntryProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
   const [focused, setFocused] = useState(false);
 
@@ -267,7 +277,8 @@ function DurationEntry({
       <Text
         style={[
           styles.timeEntry,
-          focused ? styles.timeEntryFocused : null,
+          { color: palette.ink },
+          focused ? { color: isDark ? darkColors.primaryDark : colors.primary } : null,
           digits === "" ? styles.timeEntryEmpty : null,
         ]}
       >
@@ -326,10 +337,13 @@ function CountdownPanel({
   onStartPause,
   onReset,
 }: CountdownPanelProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <View style={styles.section}>
       <Card size="large" style={styles.timeCard}>
-        <Text style={styles.modeLabel}>Timer</Text>
+        <Text style={[styles.modeLabel, { color: isDark ? darkColors.primaryDark : colors.primary }]}>Timer</Text>
 
         {canEditDuration ? (
           <>
@@ -342,8 +356,8 @@ function CountdownPanel({
           </>
         ) : (
           <>
-            <Text style={styles.time}>{remainingFormatted}</Text>
-            <Text style={styles.helper}>
+            <Text style={[styles.time, { color: palette.ink }]}>{remainingFormatted}</Text>
+            <Text style={[styles.helper, { color: palette.textMuted }]}>
               {isFinished
                 ? "Tempo concluído."
                 : isRunning
@@ -353,7 +367,7 @@ function CountdownPanel({
           </>
         )}
 
-        <View style={styles.progressTrack} accessibilityElementsHidden>
+        <View style={[styles.progressTrack, { backgroundColor: palette.primaryGlow }]} accessibilityElementsHidden>
           <View
             style={[styles.progressFill, { width: `${progressPercent}%` }]}
           />
@@ -366,17 +380,17 @@ function CountdownPanel({
                 onPress={onDecrease}
                 accessibilityRole="button"
                 accessibilityLabel="Diminuir 1 minuto"
-                style={styles.adjustButton}
+                style={[styles.adjustButton, { backgroundColor: palette.primaryGlow }]}
               >
-                <Text style={styles.adjustLabel}>- 1 min</Text>
+                <Text style={[styles.adjustLabel, { color: isDark ? darkColors.primaryDark : colors.primary }]}>- 1 min</Text>
               </Pressable>
               <Pressable
                 onPress={onIncrease}
                 accessibilityRole="button"
                 accessibilityLabel="Aumentar 1 minuto"
-                style={styles.adjustButton}
+                style={[styles.adjustButton, { backgroundColor: palette.primaryGlow }]}
               >
-                <Text style={styles.adjustLabel}>+ 1 min</Text>
+                <Text style={[styles.adjustLabel, { color: isDark ? darkColors.primaryDark : colors.primary }]}>+ 1 min</Text>
               </Pressable>
             </View>
 
@@ -393,12 +407,14 @@ function CountdownPanel({
                       accessibilityState={{ selected }}
                       style={[
                         styles.presetButton,
+                        { backgroundColor: palette.surface, borderColor: palette.border },
                         selected ? styles.presetButtonSelected : null,
                       ]}
                     >
                       <Text
                         style={[
                           styles.presetLabel,
+                          { color: palette.ink },
                           selected ? styles.presetLabelSelected : null,
                         ]}
                       >
@@ -452,11 +468,14 @@ function StopwatchPanel({
   onReset,
   onMarkLap,
 }: StopwatchPanelProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <View style={styles.section}>
       <Card size="large" style={styles.timeCard}>
-        <Text style={styles.modeLabel}>Cronômetro</Text>
-        <Text style={styles.time}>{seconds}</Text>
+        <Text style={[styles.modeLabel, { color: isDark ? darkColors.primaryDark : colors.primary }]}>Cronômetro</Text>
+        <Text style={[styles.time, { color: palette.ink }]}>{seconds}</Text>
 
         <View style={{ paddingVertical: spacing.md, width: "100%" }}>
           <Button
@@ -467,16 +486,16 @@ function StopwatchPanel({
         </View>
 
         {laps.length === 0 ? (
-          <Text style={styles.lapHint}>Nenhum trecho marcado ainda.</Text>
+          <Text style={[styles.lapHint, { color: palette.textMuted }]}>Nenhum trecho marcado ainda.</Text>
         ) : (
           <View style={styles.lapList}>
             {laps.slice(0, 4).map((lap, index) => (
               <View key={lap.id} style={styles.lapItem}>
-                <Text style={styles.lapLabel}>
+                <Text style={[styles.lapLabel, { color: isDark ? darkColors.primaryDark : colors.primary }]}>
                   Trecho {laps.length - index}
                 </Text>
-                <Text style={styles.lapText}>{lap.subjectName}</Text>
-                <Text style={styles.lapText}>
+                <Text style={[styles.lapText, { color: palette.ink }]}>{lap.subjectName}</Text>
+                <Text style={[styles.lapText, { color: palette.ink }]}>
                   {formatStudyDuration(lap.seconds)}
                 </Text>
               </View>
@@ -527,6 +546,8 @@ function PomodoroPanel({
   onStartPause,
   onReset,
 }: PomodoroPanelProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const phaseLabel =
     phase === "focus"
       ? "Foco"
@@ -537,60 +558,60 @@ function PomodoroPanel({
   return (
     <View style={styles.section}>
       <View style={styles.pomodoroSettings}>
-        <Text style={styles.subjectLabel}>Duração dos ciclos (minutos)</Text>
+        <Text style={[styles.subjectLabel, { color: palette.ink }]}>Duração dos ciclos (minutos)</Text>
         <View style={styles.pomodoroInputs}>
           <View style={styles.pomodoroInputGroup}>
-            <Text style={styles.pomodoroInputLabel}>Foco</Text>
+            <Text style={[styles.pomodoroInputLabel, { color: palette.textMuted }]}>Foco</Text>
             <TextInput
               value={focusMinutes}
               onChangeText={onFocusMinutesChange}
               keyboardType="number-pad"
               maxLength={3}
               editable={!running}
-              style={styles.pomodoroInput}
+              style={[styles.pomodoroInput, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.ink }]}
               accessibilityLabel="Minutos de foco"
             />
           </View>
           <View style={styles.pomodoroInputGroup}>
-            <Text style={styles.pomodoroInputLabel}>Pausa curta</Text>
+            <Text style={[styles.pomodoroInputLabel, { color: palette.textMuted }]}>Pausa curta</Text>
             <TextInput
               value={shortBreakMinutes}
               onChangeText={onShortBreakMinutesChange}
               keyboardType="number-pad"
               maxLength={3}
               editable={!running}
-              style={styles.pomodoroInput}
+              style={[styles.pomodoroInput, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.ink }]}
               accessibilityLabel="Minutos da pausa curta"
             />
           </View>
           <View style={styles.pomodoroInputGroup}>
-            <Text style={styles.pomodoroInputLabel}>Pausa longa</Text>
+            <Text style={[styles.pomodoroInputLabel, { color: palette.textMuted }]}>Pausa longa</Text>
             <TextInput
               value={longBreakMinutes}
               onChangeText={onLongBreakMinutesChange}
               keyboardType="number-pad"
               maxLength={3}
               editable={!running}
-              style={styles.pomodoroInput}
+              style={[styles.pomodoroInput, { backgroundColor: palette.surface, borderColor: palette.border, color: palette.ink }]}
               accessibilityLabel="Minutos da pausa longa"
             />
           </View>
         </View>
       </View>
       <Card size="large" style={styles.timeCard}>
-        <Text style={styles.modeLabel}>{phaseLabel}</Text>
-        <Text style={styles.time}>{formatted}</Text>
-        <Text style={styles.helper}>
+        <Text style={[styles.modeLabel, { color: isDark ? darkColors.primaryDark : colors.primary }]}>{phaseLabel}</Text>
+        <Text style={[styles.time, { color: palette.ink }]}>{formatted}</Text>
+        <Text style={[styles.helper, { color: palette.textMuted }]}>
           {running ? "Em andamento." : "Pronto para começar."}
         </Text>
 
-        <View style={styles.progressTrack} accessibilityElementsHidden>
+        <View style={[styles.progressTrack, { backgroundColor: palette.primaryGlow }]} accessibilityElementsHidden>
           <View
             style={[styles.progressFill, { width: `${progressPercent}%` }]}
           />
         </View>
 
-        <Text style={styles.pomodoroCount}>
+        <Text style={[styles.pomodoroCount, { color: palette.textMuted }]}>
           {completedFocuses}{" "}
           {completedFocuses === 1 ? "foco concluído" : "focos concluídos"}
         </Text>

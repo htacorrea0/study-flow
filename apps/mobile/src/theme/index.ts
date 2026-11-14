@@ -7,7 +7,7 @@
  *
  * O mapa completo do arquivo de design está em docs/design-system.md.
  */
-export { colors, type ColorToken } from './colors';
+export { colors, darkColors, type ColorToken } from './colors';
 export { fontFamilies, typography } from './typography';
 export { radii } from './radii';
 export { sizes, spacing } from './spacing';

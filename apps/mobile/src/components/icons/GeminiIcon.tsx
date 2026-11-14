@@ -1,4 +1,5 @@
 import { SvgXml } from 'react-native-svg';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type GeminiIconProps = {
   /** Lado do quadrado em pontos. */
@@ -18,7 +19,8 @@ type GeminiIconProps = {
  * mesma definição, o que é inofensivo porque ela é idêntica.
  */
 export function GeminiIcon({ size = 24, color }: GeminiIconProps) {
-  const fill = color ?? 'url(#sf-gemini-grad)';
+  const { isDark } = useTheme();
+  const fill = color ?? (isDark ? '#c4b5fd' : 'url(#sf-gemini-grad)');
 
   const xml = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">
   <defs>

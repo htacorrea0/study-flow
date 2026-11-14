@@ -1,6 +1,7 @@
 import { StyleSheet, Text } from 'react-native';
 
 import { colors, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type FormErrorProps = {
   readonly message: string | undefined;
@@ -14,12 +15,18 @@ type FormErrorProps = {
  * reagido ao toque.
  */
 export function FormError({ message }: FormErrorProps) {
+  const { isDark } = useTheme();
+
   if (message === undefined) {
     return null;
   }
 
   return (
-    <Text style={styles.message} accessibilityLiveRegion="polite" role="alert">
+    <Text
+      style={[styles.message, isDark && styles.messageDark]}
+      accessibilityLiveRegion="polite"
+      role="alert"
+    >
       {message}
     </Text>
   );
@@ -29,5 +36,8 @@ const styles = StyleSheet.create({
   message: {
     ...typography.caption,
     color: colors.danger,
+  },
+  messageDark: {
+    color: '#fca5a5',
   },
 });

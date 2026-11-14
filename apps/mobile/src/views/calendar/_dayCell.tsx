@@ -1,7 +1,8 @@
 import type { CalendarAssessment } from '@study-flow/shared';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radii, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import type { DayCell as Cell } from '@/utils/date';
 
 type DayCellProps = {
@@ -48,12 +49,14 @@ function rotuloAcessivel(dia: number, assessments: readonly CalendarAssessment[]
  * círculo de índigo.
  */
 export function DayCell({ cell, selected, isToday, dots, assessments, onPress }: DayCellProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const visiveis = dots.slice(0, MAXIMO_DE_PONTOS);
 
   // Com mais de uma avaliação no mesmo dia o anel mostra a cor da primeira,
   // que é a de prazo mais cedo: a grade tem um anel só, e a agenda do dia
   // lista todas.
-  const corDoAnel = assessments[0]?.subject.color ?? colors.ink;
+  const corDoAnel = assessments[0]?.subject.color ?? palette.ink;
   const temPrazo = assessments.length > 0;
 
   return (
@@ -74,9 +77,10 @@ export function DayCell({ cell, selected, isToday, dots, assessments, onPress }:
         <Text
           style={[
             styles.numero,
-            !cell.inMonth ? styles.numeroVizinho : null,
-            isToday && !selected ? styles.numeroHoje : null,
+            !cell.inMonth ? { color: palette.textSubtle } : null,
+            isToday && !selected ? { color: isDark ? '#a5b4fc' : colors.primary } : null,
             selected ? styles.numeroSelecionado : null,
+            !selected && cell.inMonth ? { color: palette.ink } : null,
           ]}
         >
           {cell.day}
@@ -111,12 +115,6 @@ const styles = StyleSheet.create({
   },
   numero: {
     ...typography.dayNumber,
-  },
-  numeroVizinho: {
-    color: colors.textSubtle,
-  },
-  numeroHoje: {
-    color: colors.primary,
   },
   numeroSelecionado: {
     color: colors.white,

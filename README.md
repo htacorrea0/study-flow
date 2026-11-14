@@ -646,7 +646,10 @@ Nomes de arquivo e organização de pastas:
 
 **Autenticação completa, ponta a ponta:**
 
-- `POST /auth/signup`, `POST /auth/login` e `GET /auth/me` na API, com senha
+- `POST /auth/signup`, `POST /auth/login`, `GET /auth/me` e os endpoints
+  autenticados de perfil (`GET/PATCH /auth/profile`,
+  `PATCH /auth/profile/password` e
+  `PATCH /auth/profile/notifications`) na API, com senha
   guardada só como hash Argon2id, JWT de acesso, rate limit nas rotas de auth
   e mensagem de erro genérica no login (não revela se o e-mail existe).
 - Telas de **login** e **cadastro** no app, seguindo o Figma de referência
@@ -705,6 +708,9 @@ Nomes de arquivo e organização de pastas:
   o tempo por matéria e alimentam os resumos mensais de progresso. O Pomodoro
   começa com ciclos de 5 minutos de foco, 1 minuto de pausa curta e 2 minutos
   de pausa longa, com durações editáveis na tela.
+- **Perfil**: acessível pelo avatar do dashboard, exibe os dados da conta,
+  permite alterar nome, e-mail e senha, controlar notificações diárias,
+  alternar o tema claro/escuro, consultar métricas básicas e sair da sessão.
 - **Profundidade de estudo** por conteúdo (básico, intermediário ou intenso):
   decide em quantos dias diferentes aquele assunto é agendado, de uma a três
   passadas, com a revisão custando metade do esforço da primeira passada. É
@@ -737,7 +743,6 @@ Nomes de arquivo e organização de pastas:
 
 **Interface**
 
-- Tela de perfil.
 - Arrastar uma atividade para outro dia. A redistribuição é automática; não
   há edição manual da grade.
 - Recuperação de senha, onboarding e login com Google ou Apple.

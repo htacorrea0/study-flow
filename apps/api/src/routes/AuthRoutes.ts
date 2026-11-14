@@ -2,11 +2,20 @@ import { Router } from 'express';
 
 import { LoginController } from '../controllers/auth/LoginController';
 import { MeController } from '../controllers/auth/MeController';
+import { UpdateNotificationPreferenceController } from '../controllers/auth/NotificationPreferenceController';
+import { UpdatePasswordController } from '../controllers/auth/PasswordController';
+import { ProfileController, UpdateProfileController } from '../controllers/auth/ProfileController';
 import { SignUpController } from '../controllers/auth/SignUpController';
 import { authenticate } from '../middlewares/AuthenticateMiddleware';
 import { rateLimit } from '../middlewares/RateLimitMiddleware';
 import { validateRequest } from '../middlewares/ValidateRequestMiddleware';
-import { signInSchema, signUpSchema } from '../schemas/AuthSchemas';
+import {
+  signInSchema,
+  signUpSchema,
+  updateNotificationPreferencesSchema,
+  updatePasswordSchema,
+  updateProfileSchema,
+} from '../schemas/AuthSchemas';
 
 export const authRoutes = Router();
 
@@ -44,3 +53,22 @@ authRoutes.post(
 );
 
 authRoutes.get('/me', authenticate, MeController);
+authRoutes.get('/profile', authenticate, ProfileController);
+authRoutes.patch(
+  '/profile',
+  authenticate,
+  validateRequest({ body: updateProfileSchema }),
+  UpdateProfileController,
+);
+authRoutes.patch(
+  '/profile/password',
+  authenticate,
+  validateRequest({ body: updatePasswordSchema }),
+  UpdatePasswordController,
+);
+authRoutes.patch(
+  '/profile/notifications',
+  authenticate,
+  validateRequest({ body: updateNotificationPreferencesSchema }),
+  UpdateNotificationPreferenceController,
+);

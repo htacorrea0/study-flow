@@ -4,7 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BookOpenIcon, ClockIcon } from '@/components/icons';
 import { DateField, Segmented, TextField } from '@/components/ui';
 import type { AssessmentFormController } from '@/controllers/assessments/AssessmentFormController';
-import { colors, radii, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type AssessmentFormProps = {
   readonly controller: AssessmentFormController;
@@ -59,10 +60,13 @@ function SubjectChip({
  * um botão no meio da rolagem convida a salvar antes de listar o conteúdo.
  */
 export function AssessmentForm({ controller }: AssessmentFormProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <View style={styles.form}>
       <View style={styles.campo}>
-        <Text style={styles.label}>Matéria</Text>
+        <Text style={[styles.label, { color: palette.ink }]}>Matéria</Text>
         <View style={styles.chips} accessibilityRole="radiogroup">
           {controller.subjects.map((subject) => (
             <SubjectChip

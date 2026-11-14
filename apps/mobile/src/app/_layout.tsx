@@ -9,17 +9,27 @@ import { Outfit_700Bold } from '@expo-google-fonts/outfit/700Bold';
 import { Outfit_800ExtraBold } from '@expo-google-fonts/outfit/800ExtraBold';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { SessionProvider } from '@/contexts/SessionContext';
-import { colors } from '@/theme';
+import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { colors, darkColors } from '@/theme';
 
 // Segura a splash enquanto as fontes carregam. Chamado no escopo do módulo,
 // antes de qualquer render: dentro de um efeito a primeira tela já teria
 // aparecido com a fonte do sistema e trocado logo em seguida.
 void SplashScreen.preventAutoHideAsync();
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 /**
  * Layout raiz.
@@ -51,14 +61,26 @@ export default function RootLayout() {
   }
 
   return (
-    <SessionProvider>
-      <StatusBar style="dark" />
+    <ThemeProvider>
+      <SessionProvider>
+        <RootNavigation />
+      </SessionProvider>
+    </ThemeProvider>
+  );
+}
+
+function RootNavigation() {
+  const { isDark } = useTheme();
+
+  return (
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: colors.canvas },
+          contentStyle: { backgroundColor: isDark ? darkColors.canvas : colors.canvas },
         }}
       />
-    </SessionProvider>
+    </>
   );
 }
