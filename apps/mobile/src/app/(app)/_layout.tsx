@@ -19,9 +19,7 @@ import { AssistantLauncher } from '@/views/studyAssistant/_assistantLauncher';
  * servidor, que exige um JWT válido em toda rota protegida.
  *
  * As abas são declaradas uma a uma para fixar a ordem do Figma, que não é a
- * ordem alfabética dos arquivos. Timer e Progresso apontam para telas em
- * branco; elas existem na navegação por decisão de produto, e cada uma diz
- * na própria tela que ainda não faz nada.
+ * ordem alfabética dos arquivos.
  */
 export default function AppLayout() {
   const { status } = useSession();
@@ -38,7 +36,13 @@ export default function AppLayout() {
   // ele dividem um mesmo contêiner, com o botão desenhado depois (por cima).
   return (
     <View style={{ flex: 1 }}>
-      <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <BottomTabBar {...props} />}>
+      <Tabs
+        // Sair da aba devolve a pilha dela ao começo: tocar em "Matérias"
+        // sempre abre a lista de matérias, e não a tela empilhada onde a
+        // pessoa parou da última vez.
+        screenOptions={{ headerShown: false, popToTopOnBlur: true }}
+        tabBar={(props) => <BottomTabBar {...props} />}
+      >
         <Tabs.Screen name="index" options={{ title: 'Início' }} />
         <Tabs.Screen name="materias" options={{ title: 'Matérias' }} />
         <Tabs.Screen name="calendario" options={{ title: 'Calendário' }} />

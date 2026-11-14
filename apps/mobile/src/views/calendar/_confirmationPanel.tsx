@@ -1,7 +1,7 @@
 import type { SessionItem } from '@study-flow/shared';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Banner, Button, Card, Checkbox } from '@/components/ui';
+import { Banner, Button, Card, Checkbox, toneDoAviso } from '@/components/ui';
 import { useDayConfirmationController } from '@/controllers/calendar/DayConfirmationController';
 import { colors, darkColors, spacing, typography } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -69,7 +69,7 @@ export function ConfirmationPanel({ date, today, sessions, onConfirmed }: Confir
           {controller.conflicts.map((conflict) => (
             <Banner
               key={`${conflict.kind}-${conflict.assessmentId}`}
-              tone="warning"
+              tone={toneDoAviso(conflict.kind)}
               message={conflict.message}
             />
           ))}

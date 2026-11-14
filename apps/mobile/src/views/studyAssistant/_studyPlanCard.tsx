@@ -39,9 +39,9 @@ function minutos(total: number): string {
  * Cartão do plano de estudos devolvido pelo Gemini.
  *
  * Três blocos: matérias (com prioridade e carga semanal), a semana dia a dia
- * e as dicas. O botão no fim aplica o plano: cadastra as matérias que
- * faltam e o guarda, para a aba Matérias mostrar o que estudar e o tempo de
- * cada uma.
+ * e as dicas. O botão no fim aplica o plano: cadastra as matérias, as provas
+ * e os conteúdos que faltam, refaz o calendário e guarda o plano, para a aba
+ * Matérias mostrar o que estudar e o tempo de cada uma.
  */
 export function StudyPlanCard({ plan, saveState, onApply }: StudyPlanCardProps) {
   const { isDark } = useTheme();
@@ -147,7 +147,7 @@ export function StudyPlanCard({ plan, saveState, onApply }: StudyPlanCardProps) 
       {plan.subjects.length > 0 ? (
         <View style={styles.acoes}>
           <Button
-            label={saveState?.status === 'done' ? 'Aplicar de novo' : 'Aplicar plano nas Matérias'}
+            label={saveState?.status === 'done' ? 'Aplicar de novo' : 'Aplicar plano no calendário'}
             variant={saveState?.status === 'done' ? 'secondary' : 'primary'}
             loading={saveState?.status === 'saving'}
             onPress={onApply}

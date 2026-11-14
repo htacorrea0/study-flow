@@ -1,4 +1,11 @@
-import type { AiPlanPriority, AiPlanSession, AiPlanSubject, AiStudyPlan, Weekday } from '@study-flow/shared';
+import {
+  normalizeSubjectName,
+  type AiPlanPriority,
+  type AiPlanSession,
+  type AiPlanSubject,
+  type AiStudyPlan,
+  type Weekday,
+} from '@study-flow/shared';
 
 import { formatStudyDuration } from './duration';
 
@@ -9,16 +16,13 @@ import { formatStudyDuration } from './duration';
  * o app as guarda pelo nome que a pessoa cadastrou. A comparação ignora
  * maiúsculas, acentos e espaços extras, para "Cálculo I" e "calculo i"
  * serem a mesma matéria.
+ *
+ * A normalização mora no pacote compartilhado porque a API faz a mesma
+ * comparação ao aplicar o plano: duas versões da regra abririam a porta
+ * para o app achar que a matéria existe e o servidor criar outra.
  */
 
-export function normalizeSubjectName(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLocaleLowerCase('pt-BR');
-}
+export { normalizeSubjectName };
 
 /** A matéria do plano com este nome, se houver. */
 export function findPlanSubject(plan: AiStudyPlan | null, name: string): AiPlanSubject | null {

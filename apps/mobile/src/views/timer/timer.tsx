@@ -94,10 +94,78 @@ export default function Timer() {
         onChange={controller.switchMode}
       />
 
+      {controller.sessions.length === 0 ? null : (
+        <View style={styles.subjectSection}>
+          <Text style={styles.subjectLabel}>Sessão de hoje</Text>
+          <Text style={styles.subjectHint}>
+            Escolha uma sessão para o tempo contar nela. Ao completar os minutos previstos, ela
+            fecha sozinha no calendário.
+          </Text>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.subjectChips}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Pressable
+              onPress={() => controller.setSelectedActivityId(null)}
+              accessibilityRole="radio"
+              accessibilityLabel="Nenhuma sessão"
+              accessibilityState={{
+                selected: controller.selectedActivityId === null,
+                checked: controller.selectedActivityId === null,
+              }}
+              style={[
+                styles.subjectChip,
+                controller.selectedActivityId === null ? styles.subjectChipSelected : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.subjectChipLabel,
+                  controller.selectedActivityId === null ? styles.subjectChipLabelSelected : null,
+                ]}
+              >
+                Nenhuma
+              </Text>
+            </Pressable>
+
+            {controller.sessions.map((session) => {
+              const selected = session.activityId === controller.selectedActivityId;
+
+              return (
+                <Pressable
+                  key={session.activityId}
+                  onPress={() => controller.setSelectedActivityId(session.activityId)}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${session.title}, ${session.estimatedMinutes} minutos`}
+                  accessibilityState={{ selected, checked: selected }}
+                  style={[styles.subjectChip, selected ? styles.subjectChipSelected : null]}
+                >
+                  <Text
+                    style={[
+                      styles.subjectChipLabel,
+                      selected ? styles.subjectChipLabelSelected : null,
+                    ]}
+                  >
+                    {`${session.title} · ${session.estimatedMinutes} min`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       <View style={styles.subjectSection}>
         <Text style={[styles.subjectLabel, { color: palette.ink }]}>Matéria em foco</Text>
 
-        {controller.subjectLoadStatus === "error" ? (
+        {controller.selectedActivityId !== null ? (
+          <Text style={styles.subjectHint}>
+            A matéria vem da sessão escolhida. Tire a sessão para registrar o tempo em outra.
+          </Text>
+        ) : controller.subjectLoadStatus === 'error' ? (
           <Text style={styles.subjectError}>{controller.subjectError}</Text>
         ) : controller.subjects.length === 0 ? (
           <Text style={styles.subjectHint}>
@@ -198,7 +266,7 @@ export default function Timer() {
       <ConfirmDialog
         visible={controller.registerPromptVisible}
         title="Salvar tempo estudado?"
-        message={`Você estudou ${formatStudyDuration(controller.registerPromptSeconds)} em ${controller.selectedSubjectName}. Quer registrar esse tempo no seu progresso?`}
+        message={`Você estudou ${formatStudyDuration(controller.registerPromptSeconds)} em ${controller.focusLabel}. Quer registrar esse tempo no seu progresso?`}
         confirmLabel="Salvar"
         cancelLabel="Agora não"
         confirming={controller.registeringStudyTime}

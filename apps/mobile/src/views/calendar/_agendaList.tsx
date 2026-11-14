@@ -1,8 +1,10 @@
 import type { CalendarAssessment, SessionItem as Session } from '@study-flow/shared';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, darkColors, spacing, typography } from '@/theme';
+import { ClockIcon } from '@/components/icons';
+import { ListRow } from '@/components/ui';
 import { useTheme } from '@/contexts/ThemeContext';
+import { colors, darkColors, spacing, typography } from '@/theme';
 import { SessionItem } from '@/views/_templates/_sessionItem';
 import { SkeletonBlock } from '@/views/_templates/_skeletonBlock';
 import { radii } from '@/theme';
@@ -13,6 +15,10 @@ type AgendaListProps = {
   readonly assessments: readonly CalendarAssessment[];
   readonly sessions: readonly Session[];
   readonly loading: boolean;
+  /** Ausente nos dias passados, que a rota de escrita também recusa. */
+  readonly onAdjustTime?: (() => void) | undefined;
+  /** Abre o detalhe da sessão, com o material sugerido para ela. */
+  readonly onOpenSession: (activityId: string) => void;
 };
 
 /**
@@ -27,7 +33,14 @@ type AgendaListProps = {
  * sessão, e aparece mesmo com um prazo em cima — "a prova é hoje e não há
  * nada marcado" é exatamente o que vale a pena saber.
  */
-export function AgendaList({ title, assessments, sessions, loading }: AgendaListProps) {
+export function AgendaList({
+  title,
+  assessments,
+  sessions,
+  loading,
+  onAdjustTime,
+  onOpenSession,
+}: AgendaListProps) {
   const { isDark } = useTheme();
   const palette = isDark ? darkColors : colors;
 
@@ -50,7 +63,22 @@ export function AgendaList({ title, assessments, sessions, loading }: AgendaList
             {sessions.length === 0 ? (
               <Text style={styles.vazio}>Nenhuma sessão de estudo marcada para este dia.</Text>
             ) : (
-              sessions.map((session) => <SessionItem key={session.activityId} session={session} />)
+              sessions.map((session) => (
+                <SessionItem
+                  key={session.activityId}
+                  session={session}
+                  onPress={() => onOpenSession(session.activityId)}
+                />
+              ))
+            )}
+
+            {onAdjustTime === undefined ? null : (
+              <ListRow
+                title="Ajustar meu tempo neste dia"
+                subtitle="Vale só para esta data, no lugar do tempo da semana."
+                icon={ClockIcon}
+                onPress={onAdjustTime}
+              />
             )}
           </>
         )}

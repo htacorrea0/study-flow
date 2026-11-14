@@ -5,9 +5,10 @@ import {
   type PlanConflict,
   type Weekday,
 } from '@study-flow/shared';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
+import { usePlanConflicts } from '@/contexts/PlanConflictsContext';
 import { ApiError } from '@/services/api';
 import {
   deleteAvailabilityException,
@@ -76,13 +77,17 @@ function minutosDe(texto: string): number {
  * Os sete dias são gravados de uma vez, como o `PUT` exige: a semana é uma
  * coisa só, e mandar dia a dia abriria espaço para o plano ser recalculado
  * sete vezes sobre estados intermediários que a pessoa nunca quis.
+ *
+ * O `backHref` vem da tela porque esta é aberta tanto de Matérias quanto do
+ * Calendário: voltar pelo histórico levaria para a aba de onde a pessoa veio,
+ * e não para a tela que contém esta.
  */
-export function useAvailabilityController(): AvailabilityController {
+export function useAvailabilityController(backHref: Href): AvailabilityController {
   const router = useRouter();
 
   const [status, setStatus] = useState<AvailabilityStatus>('loading');
   const [rows, setRows] = useState<readonly AvailabilityRow[]>(() => montarLinhas([]));
-  const [conflicts, setConflicts] = useState<readonly PlanConflict[]>([]);
+  const { conflicts, setConflicts } = usePlanConflicts();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -233,6 +238,6 @@ export function useAvailabilityController(): AvailabilityController {
       }
     },
     reload: () => void load(),
-    goBack: () => router.back(),
+    goBack: () => router.dismissTo(backHref),
   };
 }

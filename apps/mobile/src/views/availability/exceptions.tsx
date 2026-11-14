@@ -21,7 +21,7 @@ function dataLegivel(iso: string): string {
 }
 
 export default function AvailabilityExceptions() {
-  const controller = useAvailabilityController();
+  const controller = useAvailabilityController('/materias/disponibilidade');
   const { isDark } = useTheme();
   const palette = isDark ? darkColors : colors;
 

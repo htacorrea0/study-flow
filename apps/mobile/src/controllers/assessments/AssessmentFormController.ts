@@ -8,9 +8,10 @@ import {
   type StudyDepth,
   type SubjectResponse,
 } from '@study-flow/shared';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
+import { usePlanConflicts } from '@/contexts/PlanConflictsContext';
 import {
   createAssessment,
   createContent,
@@ -186,6 +187,7 @@ export function useAssessmentFormController(params: {
   readonly subjectId: string | undefined;
 }): AssessmentFormController {
   const router = useRouter();
+  const { conflicts, setConflicts, refresh: refreshConflicts } = usePlanConflicts();
   const { id: idDaRota } = params;
 
   /**
@@ -210,7 +212,6 @@ export function useAssessmentFormController(params: {
   const [notes, setNotes] = useState('');
   const [contents, setContents] = useState<readonly ContentDraft[]>([]);
   const [contentEditor, setContentEditor] = useState<ContentEditor | null>(null);
-  const [conflicts, setConflicts] = useState<readonly PlanConflict[]>([]);
   const [errors, setErrors] = useState<FormErrors<AssessmentField>>(EMPTY_ERRORS);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -248,6 +249,8 @@ export function useAssessmentFormController(params: {
   useEffect(() => {
     void load(idDaRota);
   }, [idDaRota, load]);
+
+  useFocusEffect(refreshConflicts);
 
   function setFieldError(field: AssessmentField, message: string | undefined): void {
     setErrors((current) => ({ ...current, fields: { ...current.fields, [field]: message } }));
@@ -291,7 +294,6 @@ export function useAssessmentFormController(params: {
       return;
     }
 
-    setConflicts([]);
     setSubmitting(true);
 
     try {
@@ -311,7 +313,6 @@ export function useAssessmentFormController(params: {
   }
 
   async function removerConteudo(contentId: string): Promise<void> {
-    setConflicts([]);
     setSubmitting(true);
 
     try {
@@ -386,9 +387,6 @@ export function useAssessmentFormController(params: {
     }
 
     setErrors(EMPTY_ERRORS);
-    // Os avisos sao do salvamento anterior. Quem corrigiu o que nao coube e
-    // salvou de novo precisa ver o resultado novo, nao o aviso velho.
-    setConflicts([]);
     setSubmitting(true);
 
     try {
@@ -397,11 +395,12 @@ export function useAssessmentFormController(params: {
           ? await createAssessment(parsed.data)
           : await updateAssessment(id, parsed.data);
 
-      // Com aviso, a tela fica aberta mostrando o que não coube; sem aviso,
-      // não há o que ler e voltar é o que a pessoa espera.
-      if (resposta.conflicts.length > 0) {
+      setConflicts(resposta.conflicts);
+
+      // Com aviso desta avaliação, a tela fica aberta mostrando o que não
+      // coube; sem aviso, não há o que ler e voltar é o que a pessoa espera.
+      if (resposta.conflicts.some((aviso) => aviso.assessmentId === resposta.assessment.id)) {
         setIdCriado(resposta.assessment.id);
-        setConflicts(resposta.conflicts);
         setContents(resposta.assessment.contents.map(paraRascunho));
         return;
       }
@@ -423,6 +422,7 @@ export function useAssessmentFormController(params: {
 
     try {
       await deleteAssessment(id);
+      refreshConflicts();
       setAskingDeletion(false);
       router.back();
     } catch (error) {

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -24,8 +25,17 @@ export function AssistantLauncher() {
   const insets = useSafeAreaInsets();
   const { isDark } = useTheme();
   const palette = isDark ? darkColors : colors;
+  const router = useRouter();
   const [aberto, setAberto] = useState(false);
-  const controller = useStudyAssistantController();
+
+  // Aplicar o plano é a única ação do chat cujo resultado aparece fora dele:
+  // o chat sai da frente e a pessoa cai onde o calendário acabou de mudar.
+  const onApplied = useCallback(() => {
+    setAberto(false);
+    router.push('/calendario');
+  }, [router]);
+
+  const controller = useStudyAssistantController({ onApplied });
 
   return (
     <>

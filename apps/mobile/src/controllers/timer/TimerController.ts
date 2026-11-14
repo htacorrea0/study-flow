@@ -1,11 +1,13 @@
-import type { SubjectResponse, StudyTimeSource } from "@study-flow/shared";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { SessionItem, SubjectResponse, StudyTimeSource } from '@study-flow/shared';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ApiError } from "@/services/api";
-import { registerStudyTime } from "@/services/activities/ActivityService";
-import { fetchSubjects } from "@/services/subjects/SubjectService";
-import { formatClockDuration } from "@/utils/duration";
+import { ApiError } from '@/services/api';
+import { registerStudyTime } from '@/services/activities/ActivityService';
+import { fetchDay } from '@/services/calendar/CalendarService';
+import { fetchSubjects } from '@/services/subjects/SubjectService';
+import { todayIsoDate } from '@/utils/date';
+import { formatClockDuration, formatStudyDuration } from '@/utils/duration';
 
 const DEFAULT_TIMER_SECONDS = 25 * 60;
 const MIN_TIMER_SECONDS = 1;
@@ -35,6 +37,7 @@ type RegisterPrompt = {
   readonly seconds: number;
   readonly source: StudyTimeSource;
   readonly subjectId: string | null;
+  readonly activityId: string | null;
 };
 
 export type TimerController = {
@@ -47,6 +50,21 @@ export type TimerController = {
   readonly selectedSubjectId: string | null;
   readonly setSelectedSubjectId: (subjectId: string | null) => void;
   readonly selectedSubjectName: string;
+
+  /**
+   * Sessões do plano marcadas para hoje.
+   *
+   * Cronometrar sobre uma delas credita o tempo na sessão: quando o total
+   * alcança os minutos previstos, a sessão fecha sozinha e o calendário
+   * reage. Sem sessão escolhida, o tempo continua sendo só da matéria, como
+   * sempre foi.
+   */
+  readonly sessions: readonly SessionItem[];
+  readonly sessionsLoadStatus: SubjectLoadStatus;
+  readonly selectedActivityId: string | null;
+  readonly setSelectedActivityId: (activityId: string | null) => void;
+  /** O que o tempo vai creditar: o título da sessão ou o nome da matéria. */
+  readonly focusLabel: string;
 
   readonly registerPromptVisible: boolean;
   readonly registerPromptSeconds: number;
@@ -152,12 +170,17 @@ export function useTimerController(): TimerController {
     null,
   );
 
-  const [countdownDurationSeconds, setCountdownDurationSeconds] = useState(
-    DEFAULT_TIMER_SECONDS,
+  const { activityId: activityIdDaRota } = useLocalSearchParams<{ activityId?: string }>();
+  const [sessions, setSessions] = useState<readonly SessionItem[]>([]);
+  const [sessionsLoadStatus, setSessionsLoadStatus] = useState<SubjectLoadStatus>('loading');
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(
+    activityIdDaRota ?? null,
   );
-  const [countdownRemainingSeconds, setCountdownRemainingSeconds] = useState(
-    DEFAULT_TIMER_SECONDS,
-  );
+
+  const [countdownDurationSeconds, setCountdownDurationSeconds] =
+    useState(DEFAULT_TIMER_SECONDS);
+  const [countdownRemainingSeconds, setCountdownRemainingSeconds] =
+    useState(DEFAULT_TIMER_SECONDS);
   const [countdownRunning, setCountdownRunning] = useState(false);
   const [
     countdownSegmentStartRemainingSeconds,
@@ -192,6 +215,7 @@ export function useTimerController(): TimerController {
     seconds: 0,
     source: "TIMER",
     subjectId: null,
+    activityId: null,
   });
   const [registeringStudyTime, setRegisteringStudyTime] = useState(false);
   const [registerFeedback, setRegisterFeedback] = useState<string | null>(null);
@@ -237,10 +261,43 @@ export function useTimerController(): TimerController {
     }
   }, []);
 
+  const loadSessions = useCallback(async () => {
+    setSessionsLoadStatus('loading');
+
+    try {
+      const dia = await fetchDay(todayIsoDate());
+      setSessions(dia.sessions);
+      setSessionsLoadStatus('ready');
+      setSelectedActivityId((current) =>
+        current !== null && dia.sessions.some((session) => session.activityId === current)
+          ? current
+          : null,
+      );
+    } catch {
+      // A agenda do dia é um atalho, não o motivo da tela existir: sem ela o
+      // timer segue registrando o tempo pela matéria.
+      setSessions([]);
+      setSessionsLoadStatus('error');
+      setSelectedActivityId(null);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void loadSubjects();
-    }, [loadSubjects]),
+      void loadSessions();
+    }, [loadSessions, loadSubjects]),
+  );
+
+  useEffect(() => {
+    if (activityIdDaRota !== undefined) {
+      setSelectedActivityId(activityIdDaRota);
+    }
+  }, [activityIdDaRota]);
+
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.activityId === selectedActivityId) ?? null,
+    [selectedActivityId, sessions],
   );
 
   /** Aplica uma duração vinda de preset ou dos botões +/-, e reflete na digitação. */
@@ -288,6 +345,7 @@ export function useTimerController(): TimerController {
       source,
       seconds,
       subjectId: selectedSubjectId,
+      activityId: selectedSession === null ? null : selectedSession.activityId,
     });
   }
 
@@ -558,17 +616,32 @@ export function useTimerController(): TimerController {
     setRegisteringStudyTime(true);
 
     try {
-      // Sem texto de confirmação: o acumulado fica na aba Progresso.
-      await registerStudyTime({
+      // Com sessão escolhida, a matéria vem dela no servidor; sem sessão, o
+      // acumulado fica na aba Progresso e não há o que dizer aqui.
+      const resposta = await registerStudyTime({
         seconds: registerPrompt.seconds,
         source: registerPrompt.source,
-        ...(registerPrompt.subjectId === null
-          ? {}
-          : { subjectId: registerPrompt.subjectId }),
+        ...(registerPrompt.activityId === null
+          ? registerPrompt.subjectId === null
+            ? {}
+            : { subjectId: registerPrompt.subjectId }
+          : { activityId: registerPrompt.activityId }),
       });
 
-      setRegisterFeedback(null);
+      setRegisterFeedback(
+        resposta.activityCompleted === null
+          ? null
+          : resposta.activityCompleted
+            ? 'Sessão concluída. Ela já aparece como estudada no calendário.'
+            : `Tempo creditado na sessão. Faltam ${formatStudyDuration(
+                (resposta.activityRemainingMinutes ?? 0) * 60,
+              )} para fechá-la.`,
+      );
       setRegisterPrompt((current) => ({ ...current, visible: false }));
+
+      if (registerPrompt.activityId !== null) {
+        await loadSessions();
+      }
     } catch (error) {
       setRegisterFeedback(
         error instanceof ApiError
@@ -613,6 +686,12 @@ export function useTimerController(): TimerController {
     selectedSubjectId,
     setSelectedSubjectId,
     selectedSubjectName,
+
+    sessions,
+    sessionsLoadStatus,
+    selectedActivityId,
+    setSelectedActivityId,
+    focusLabel: selectedSession === null ? selectedSubjectName : selectedSession.title,
 
     registerPromptVisible: registerPrompt.visible,
     registerPromptSeconds: registerPrompt.seconds,

@@ -19,6 +19,8 @@ import { withOpacity } from '@/utils/color';
 
 type SessionItemProps = {
   readonly session: Session;
+  /** Ausente no dashboard: lá o item é informação, não porta de entrada. */
+  readonly onPress?: (() => void) | undefined;
 };
 
 const LADO_DO_BLOCO = 44;
@@ -87,7 +89,7 @@ export function prazoLegivel(tipo: Session['assessmentType'], dias: number): str
  * existem — a duração estimada e o prazo da avaliação — na mesma caixa, com
  * a mesma tipografia e o mesmo alinhamento.
  */
-export function SessionItem({ session }: SessionItemProps) {
+export function SessionItem({ session, onPress }: SessionItemProps) {
   const { isDark } = useTheme();
   const palette = isDark ? darkColors : colors;
   const concluida = session.status === 'DONE';
@@ -98,7 +100,11 @@ export function SessionItem({ session }: SessionItemProps) {
   const fundo = withOpacity(session.subject.color, OPACIDADE_DO_BLOCO) ?? colors.primaryGlow;
 
   return (
-    <Card style={styles.item}>
+    <Card
+      style={styles.item}
+      onPress={onPress}
+      accessibilityLabel={`Abrir ${session.title}`}
+    >
       <View style={[styles.bloco, { backgroundColor: fundo }]}>
         <Icone size={LADO_DO_ICONE} color={cor} />
       </View>

@@ -1,4 +1,5 @@
 import type {
+  ActivityDetailResponse,
   ConfirmDayInput,
   DayConfirmationResponse,
   MonthlyStudyTimeResponse,
@@ -35,5 +36,11 @@ export async function fetchMonthlyStudyTime(month: string): Promise<MonthlyStudy
   const { data } = await apiClient.get<MonthlyStudyTimeResponse>('/activities/study-time/monthly', {
     params: { month },
   });
+  return data;
+}
+
+/** A sessão aberta pelo card do dia, com as sugestões de material. */
+export async function fetchActivityDetail(activityId: string): Promise<ActivityDetailResponse> {
+  const { data } = await apiClient.get<ActivityDetailResponse>(`/activities/${activityId}`);
   return data;
 }

@@ -47,7 +47,7 @@ function totalLegivel(minutes: number): string {
  * as avaliações, porque mudar o tempo livre muda o que cabe em cada dia.
  */
 export default function Availability() {
-  const controller = useAvailabilityController();
+  const controller = useAvailabilityController('/materias');
   const { isDark } = useTheme();
   const palette = isDark ? darkColors : colors;
 

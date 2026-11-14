@@ -40,7 +40,10 @@ export type CalendarController = {
    * sozinha não explica o motivo. `null` enquanto a resposta não chega.
    */
   readonly needsAvailability: boolean | null;
-  readonly goToAvailability: () => void;
+  /** Sem data, abre a semana; com data, abre o ajuste daquele dia. */
+  readonly goToAvailability: (date?: IsoDate) => void;
+  /** Abre o detalhe de uma sessão, com o material sugerido para ela. */
+  readonly goToSession: (activityId: string) => void;
   readonly goToPreviousMonth: () => void;
   readonly goToNextMonth: () => void;
   readonly goToToday: () => void;
@@ -176,7 +179,14 @@ export function useCalendarController(): CalendarController {
     daySessions,
     dayAssessments,
     needsAvailability,
-    goToAvailability: () => router.push('/materias/disponibilidade'),
+    goToAvailability: (date) =>
+      router.push(
+        date === undefined
+          ? '/materias/disponibilidade'
+          : `/materias/disponibilidade?date=${date}`,
+      ),
+    goToSession: (activityId) =>
+      router.push({ pathname: '/calendario/sessao/[activityId]', params: { activityId } }),
     goToPreviousMonth: () => irPara(addMonths(month, -1)),
     goToNextMonth: () => irPara(addMonths(month, 1)),
     goToToday: () => {

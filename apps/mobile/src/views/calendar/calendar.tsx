@@ -80,6 +80,12 @@ export default function Calendar() {
         assessments={controller.dayAssessments}
         sessions={controller.daySessions}
         loading={controller.dayStatus === 'loading'}
+        onOpenSession={controller.goToSession}
+        onAdjustTime={
+          controller.selectedDate < controller.today
+            ? undefined
+            : () => controller.goToAvailability(controller.selectedDate)
+        }
       />
 
       {controller.dayStatus === 'ready' ? (

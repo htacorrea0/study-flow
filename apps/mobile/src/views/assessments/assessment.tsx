@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Trash2Icon } from '@/components/icons';
-import { Banner, Button, ConfirmDialog, ScreenContainer } from '@/components/ui';
+import { Banner, Button, ConfirmDialog, ScreenContainer, toneDoAviso } from '@/components/ui';
 import { useAssessmentFormController } from '@/controllers/assessments/AssessmentFormController';
 import { spacing } from '@/theme';
 import { ErrorState } from '@/views/_templates/_errorState';
@@ -51,7 +51,11 @@ export default function Assessment() {
         onAction={controller.editing ? controller.askDeletion : undefined}
       >
         {controller.conflicts.map((conflict) => (
-          <Banner key={`${conflict.kind}-${conflict.assessmentId}`} tone="warning" message={conflict.message} />
+          <Banner
+            key={`${conflict.kind}-${conflict.assessmentId}`}
+            tone={toneDoAviso(conflict.kind)}
+            message={conflict.message}
+          />
         ))}
       </ScreenTopBar>
 

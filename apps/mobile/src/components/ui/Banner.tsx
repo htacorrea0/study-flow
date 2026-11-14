@@ -4,9 +4,18 @@ import { AlertTriangleIcon, CheckIcon, type IconProps } from '@/components/icons
 import { colors, radii, sizes, spacing, typography } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
+import type { PlanConflictKind } from '@study-flow/shared';
 import type { ComponentType } from 'react';
 
 type BannerTone = 'info' | 'warning';
+
+/**
+ * Plano comprimido não é problema: o cronograma coube, só em ritmo menor do
+ * que o ideal. Os outros avisos continuam alerta, porque neles algo não cabe.
+ */
+export function toneDoAviso(kind: PlanConflictKind): BannerTone {
+  return kind === 'COMPRESSED_PLAN' ? 'info' : 'warning';
+}
 
 type BannerProps = {
   readonly tone?: BannerTone;

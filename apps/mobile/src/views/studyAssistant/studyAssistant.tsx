@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AlertTriangleIcon, GeminiIcon, RotateCcwIcon, XIcon } from '@/components/icons';
+import { ConfirmDialog } from '@/components/ui';
 import {
   QUICK_PROMPTS,
   type StudyAssistantController,
@@ -21,6 +22,7 @@ import { colors, darkColors, radii, sizes, spacing, typography } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
 import { Composer } from './_composer';
+import { DeadlinePromptDialog } from './_deadlinePrompt';
 import { MessageBubble } from './_messageBubble';
 import { StudyPlanCard } from './_studyPlanCard';
 
@@ -186,6 +188,29 @@ export default function StudyAssistant({ controller, onClose }: StudyAssistantPr
           onSend={() => c.send()}
         />
       </View>
+
+      {c.deadlinePrompt ? (
+        <DeadlinePromptDialog
+          prompt={c.deadlinePrompt}
+          onConfirm={c.confirmDeadlines}
+          onCancel={c.cancelDeadlines}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        visible={c.availabilityPrompt !== null}
+        title="Usar a rotina do plano?"
+        message={
+          'Seus dias estão todos com zero minuto, então o calendário não tem onde encaixar as sessões. ' +
+          'Posso preencher sua disponibilidade com os minutos por dia que a IA sugeriu. Você muda isso ' +
+          'quando quiser em Matérias › Disponibilidade.'
+        }
+        confirmLabel="Preencher disponibilidade"
+        cancelLabel="Agora não"
+        confirming={c.savingAvailability}
+        onConfirm={c.confirmAvailability}
+        onCancel={c.dismissAvailability}
+      />
     </View>
   );
 }

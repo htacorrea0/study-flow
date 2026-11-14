@@ -14,6 +14,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { PlanConflictsProvider } from '@/contexts/PlanConflictsContext';
 import { SessionProvider } from '@/contexts/SessionContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { colors, darkColors } from '@/theme';
@@ -63,7 +64,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <SessionProvider>
-        <RootNavigation />
+        <PlanConflictsProvider>
+          <RootNavigation />
+        </PlanConflictsProvider>
       </SessionProvider>
     </ThemeProvider>
   );

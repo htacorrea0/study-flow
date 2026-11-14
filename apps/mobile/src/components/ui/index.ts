@@ -1,5 +1,5 @@
 export { Avatar } from './Avatar';
-export { Banner } from './Banner';
+export { Banner, toneDoAviso } from './Banner';
 export { Button } from './Button';
 export { Card } from './Card';
 export { Checkbox } from './Checkbox';

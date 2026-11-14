@@ -1,6 +1,8 @@
 import type { PlanConflict, SessionItem } from '@study-flow/shared';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
+import { usePlanConflicts } from '@/contexts/PlanConflictsContext';
 import { ApiError } from '@/services/api';
 import { confirmDay } from '@/services/activities/ActivityService';
 import type { IsoDate } from '@/utils/date';
@@ -26,9 +28,15 @@ function mensagemDe(error: unknown, padrao: string): string {
   return error instanceof ApiError ? error.message : padrao;
 }
 
-/** O que já foi registrado vira o estado inicial das caixas. */
+/**
+ * O estado inicial das caixas é a presunção do servidor: estudado.
+ *
+ * Dia que passou sem marcação conta como estudado, e só `SKIPPED` é "não
+ * estudei". A tela abre com tudo marcado e a pessoa desmarca o que falhou,
+ * que é a mesma regra do plano, visível.
+ */
 function marcacoesIniciais(sessions: readonly SessionItem[]): Map<string, boolean> {
-  return new Map(sessions.map((session) => [session.activityId, session.status === 'DONE']));
+  return new Map(sessions.map((session) => [session.activityId, session.status !== 'SKIPPED']));
 }
 
 /**
@@ -54,7 +62,7 @@ export function useDayConfirmationController(params: {
   const [checkedByActivity, setChecked] = useState<ReadonlyMap<string, boolean>>(() =>
     marcacoesIniciais(sessions),
   );
-  const [conflicts, setConflicts] = useState<readonly PlanConflict[]>([]);
+  const { conflicts, setConflicts, refresh: refreshConflicts } = usePlanConflicts();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,9 +71,10 @@ export function useDayConfirmationController(params: {
   // que tire uma sessão do dia não deixe a caixa dela marcada.
   const chave = `${date}|${sessions.map((session) => session.activityId).join(',')}`;
 
+  useFocusEffect(refreshConflicts);
+
   useEffect(() => {
     setChecked(marcacoesIniciais(sessions));
-    setConflicts([]);
     setErrorMessage(null);
     // `chave` resume `sessions`: depender da lista reiniciaria as marcações a
     // cada render, porque ela é um array novo toda vez.

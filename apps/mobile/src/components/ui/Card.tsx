@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radii, spacing } from '@/theme';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -13,6 +13,9 @@ type CardProps = {
   size?: 'default' | 'large';
   /** Ajustes pontuais de quem usa, ex.: gap entre filhos. */
   style?: StyleProp<ViewStyle>;
+  /** Com `onPress` o cartão vira botão; sem ele continua uma superfície. */
+  onPress?: (() => void) | undefined;
+  accessibilityLabel?: string | undefined;
 };
 
 /**
@@ -22,18 +25,28 @@ type CardProps = {
  * lista e 24 nos cartões que ocupam a largura da tela. O resto (fundo
  * `surface`, borda `border`, padding 16) é igual nos dois.
  */
-export function Card({ children, size = 'default', style }: CardProps) {
+export function Card({ children, size = 'default', style, onPress, accessibilityLabel }: CardProps) {
   const { isDark } = useTheme();
+  const estilo = [
+    styles.base,
+    size === 'large' ? styles.large : styles.default,
+    isDark && styles.dark,
+    style,
+  ];
+
+  if (onPress === undefined) {
+    return <View style={estilo}>{children}</View>;
+  }
 
   return (
-    <View style={[
-      styles.base,
-      size === 'large' ? styles.large : styles.default,
-      isDark && styles.dark,
-      style,
-    ]}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [estilo, pressed && styles.pressed]}
+    >
       {children}
-    </View>
+    </Pressable>
   );
 }
 
@@ -53,5 +66,8 @@ const styles = StyleSheet.create({
   dark: {
     backgroundColor: '#1f2937',
     borderColor: '#374151',
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });

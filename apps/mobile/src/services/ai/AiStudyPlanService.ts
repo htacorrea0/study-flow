@@ -2,6 +2,8 @@ import type {
   AiChatMessage,
   AiStudyPlan,
   AiStudyPlanChatResponse,
+  ApplyAiStudyPlanInput,
+  ApplyAiStudyPlanResponse,
   SavedAiStudyPlanResponse,
 } from '@study-flow/shared';
 import { Platform } from 'react-native';
@@ -75,4 +77,15 @@ export async function saveStudyPlan(plan: AiStudyPlan): Promise<SavedAiStudyPlan
 /** Tira as recomendações da IA das Matérias (as matérias continuam). */
 export async function deleteSavedStudyPlan(): Promise<void> {
   await apiClient.delete('/ai/study-plan');
+}
+
+/**
+ * Transforma o plano em matérias, avaliações e conteúdos, e refaz o
+ * calendário. É o que faz o plano da IA sair do papel.
+ */
+export async function applyStudyPlan(
+  input: ApplyAiStudyPlanInput,
+): Promise<ApplyAiStudyPlanResponse> {
+  const { data } = await apiClient.post<ApplyAiStudyPlanResponse>('/ai/study-plan/apply', input);
+  return data;
 }

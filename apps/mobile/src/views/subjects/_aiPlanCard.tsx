@@ -46,7 +46,7 @@ export function AiPlanCard({ plan, savedAt, missing, followingPrevious, onRemove
 
       {missing.length > 0 ? (
         <Text style={styles.aviso}>
-          Ainda não cadastradas: {missing.join(', ')}. Use “Aplicar plano nas Matérias” no chat
+          Ainda não cadastradas: {missing.join(', ')}. Use “Aplicar plano no calendário” no chat
           ou cadastre com o +.
         </Text>
       ) : null}
