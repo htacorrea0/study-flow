@@ -1,11 +1,11 @@
-import type { SubjectResponse, StudyTimeSource } from '@study-flow/shared';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { SubjectResponse, StudyTimeSource } from "@study-flow/shared";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ApiError } from '@/services/api';
-import { registerStudyTime } from '@/services/activities/ActivityService';
-import { fetchSubjects } from '@/services/subjects/SubjectService';
-import { formatClockDuration } from '@/utils/duration';
+import { ApiError } from "@/services/api";
+import { registerStudyTime } from "@/services/activities/ActivityService";
+import { fetchSubjects } from "@/services/subjects/SubjectService";
+import { formatClockDuration } from "@/utils/duration";
 
 const DEFAULT_TIMER_SECONDS = 25 * 60;
 const MIN_TIMER_SECONDS = 1;
@@ -14,9 +14,15 @@ const MAX_TIMER_SECONDS = 24 * 60 * 60;
 /** HHMMSS: seis dígitos, como no relógio do celular. */
 const ENTRY_MAX_DIGITS = 6;
 
-type TimerMode = 'timer' | 'cronometro';
+type TimerMode = "timer" | "cronometro" | "pomodoro";
+type PomodoroPhase = "focus" | "shortBreak" | "longBreak";
 
-type SubjectLoadStatus = 'loading' | 'ready' | 'error';
+const DEFAULT_POMODORO_FOCUS_MINUTES = 5;
+const DEFAULT_POMODORO_SHORT_BREAK_MINUTES = 1;
+const DEFAULT_POMODORO_LONG_BREAK_MINUTES = 2;
+const POMODORO_LONG_BREAK_INTERVAL = 2;
+
+type SubjectLoadStatus = "loading" | "ready" | "error";
 
 type StopwatchLap = {
   readonly id: string;
@@ -81,12 +87,29 @@ export type TimerController = {
   readonly startOrPauseStopwatch: () => void;
   readonly resetStopwatch: () => void;
   readonly markStopwatchLap: () => void;
+
+  readonly pomodoroPhase: PomodoroPhase;
+  readonly pomodoroRemainingSeconds: number;
+  readonly pomodoroRunning: boolean;
+  readonly pomodoroFormatted: string;
+  readonly pomodoroProgressPercent: number;
+  readonly pomodoroCompletedFocuses: number;
+  readonly pomodoroFocusMinutes: string;
+  readonly pomodoroShortBreakMinutes: string;
+  readonly pomodoroLongBreakMinutes: string;
+  readonly setPomodoroFocusMinutes: (value: string) => void;
+  readonly setPomodoroShortBreakMinutes: (value: string) => void;
+  readonly setPomodoroLongBreakMinutes: (value: string) => void;
+  readonly startOrPausePomodoro: () => void;
+  readonly resetPomodoro: () => void;
 };
 
 function digitsToSeconds(digits: string): number {
-  const padded = digits.padStart(ENTRY_MAX_DIGITS, '0');
+  const padded = digits.padStart(ENTRY_MAX_DIGITS, "0");
   return (
-    Number(padded.slice(0, 2)) * 3600 + Number(padded.slice(2, 4)) * 60 + Number(padded.slice(4, 6))
+    Number(padded.slice(0, 2)) * 3600 +
+    Number(padded.slice(2, 4)) * 60 +
+    Number(padded.slice(4, 6))
   );
 }
 
@@ -96,12 +119,17 @@ function secondsToDigits(totalSeconds: number): string {
   const seconds = totalSeconds % 60;
   const value = hours * 10000 + minutes * 100 + seconds;
 
-  return value === 0 ? '' : String(value);
+  return value === 0 ? "" : String(value);
 }
 
 function formatEntry(digits: string): string {
-  const padded = digits.padStart(ENTRY_MAX_DIGITS, '0');
+  const padded = digits.padStart(ENTRY_MAX_DIGITS, "0");
   return `${padded.slice(0, 2)}h ${padded.slice(2, 4)}m ${padded.slice(4, 6)}s`;
+}
+
+function pomodoroSeconds(minutes: string, fallback: number): number {
+  const parsed = Number(minutes);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed * 60 : fallback;
 }
 
 /**
@@ -114,20 +142,27 @@ function formatEntry(digits: string): string {
  * acumulado do mês vive na aba Progresso (Tempo mensal).
  */
 export function useTimerController(): TimerController {
-  const [mode, setMode] = useState<TimerMode>('timer');
+  const [mode, setMode] = useState<TimerMode>("timer");
 
   const [subjects, setSubjects] = useState<readonly SubjectResponse[]>([]);
-  const [subjectLoadStatus, setSubjectLoadStatus] = useState<SubjectLoadStatus>('loading');
+  const [subjectLoadStatus, setSubjectLoadStatus] =
+    useState<SubjectLoadStatus>("loading");
   const [subjectError, setSubjectError] = useState<string | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(
+    null,
+  );
 
-  const [countdownDurationSeconds, setCountdownDurationSeconds] =
-    useState(DEFAULT_TIMER_SECONDS);
-  const [countdownRemainingSeconds, setCountdownRemainingSeconds] =
-    useState(DEFAULT_TIMER_SECONDS);
+  const [countdownDurationSeconds, setCountdownDurationSeconds] = useState(
+    DEFAULT_TIMER_SECONDS,
+  );
+  const [countdownRemainingSeconds, setCountdownRemainingSeconds] = useState(
+    DEFAULT_TIMER_SECONDS,
+  );
   const [countdownRunning, setCountdownRunning] = useState(false);
-  const [countdownSegmentStartRemainingSeconds, setCountdownSegmentStartRemainingSeconds] =
-    useState(DEFAULT_TIMER_SECONDS);
+  const [
+    countdownSegmentStartRemainingSeconds,
+    setCountdownSegmentStartRemainingSeconds,
+  ] = useState(DEFAULT_TIMER_SECONDS);
 
   const [entryDigits, setEntryDigitsState] = useState(() =>
     secondsToDigits(DEFAULT_TIMER_SECONDS),
@@ -135,13 +170,27 @@ export function useTimerController(): TimerController {
 
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
   const [stopwatchRunning, setStopwatchRunning] = useState(false);
-  const [stopwatchSegmentStartSeconds, setStopwatchSegmentStartSeconds] = useState(0);
-  const [stopwatchLaps, setStopwatchLaps] = useState<readonly StopwatchLap[]>([]);
+  const [stopwatchSegmentStartSeconds, setStopwatchSegmentStartSeconds] =
+    useState(0);
+  const [stopwatchLaps, setStopwatchLaps] = useState<readonly StopwatchLap[]>(
+    [],
+  );
+  const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
+  const [pomodoroFocusMinutes, setPomodoroFocusMinutesState] = useState("5");
+  const [pomodoroShortBreakMinutes, setPomodoroShortBreakMinutesState] = useState("1");
+  const [pomodoroLongBreakMinutes, setPomodoroLongBreakMinutesState] = useState("2");
+  const [pomodoroRemainingSeconds, setPomodoroRemainingSeconds] = useState(
+    DEFAULT_POMODORO_FOCUS_MINUTES * 60,
+  );
+  const [pomodoroRunning, setPomodoroRunning] = useState(false);
+  const [pomodoroCompletedFocuses, setPomodoroCompletedFocuses] = useState(0);
+  const [pomodoroSegmentStartSeconds, setPomodoroSegmentStartSeconds] =
+    useState(DEFAULT_POMODORO_FOCUS_MINUTES * 60);
 
   const [registerPrompt, setRegisterPrompt] = useState<RegisterPrompt>({
     visible: false,
     seconds: 0,
-    source: 'TIMER',
+    source: "TIMER",
     subjectId: null,
   });
   const [registeringStudyTime, setRegisteringStudyTime] = useState(false);
@@ -149,32 +198,42 @@ export function useTimerController(): TimerController {
 
   const selectedSubjectName = useMemo(() => {
     if (selectedSubjectId === null) {
-      return 'Sem matéria';
+      return "Sem matéria";
     }
 
-    return subjects.find((subject) => subject.id === selectedSubjectId)?.name ?? 'Sem matéria';
+    return (
+      subjects.find((subject) => subject.id === selectedSubjectId)?.name ??
+      "Sem matéria"
+    );
   }, [selectedSubjectId, subjects]);
 
   const loadSubjects = useCallback(async () => {
-    setSubjectLoadStatus('loading');
+    setSubjectLoadStatus("loading");
     setSubjectError(null);
 
     try {
       const fetched = await fetchSubjects();
       setSubjects(fetched);
-      setSubjectLoadStatus('ready');
+      setSubjectLoadStatus("ready");
       setSelectedSubjectId((current) => {
         if (fetched.length === 0) {
           return null;
         }
-        if (current !== null && fetched.some((subject) => subject.id === current)) {
+        if (
+          current !== null &&
+          fetched.some((subject) => subject.id === current)
+        ) {
           return current;
         }
         return fetched[0]?.id ?? null;
       });
     } catch (error) {
-      setSubjectLoadStatus('error');
-      setSubjectError(error instanceof ApiError ? error.message : 'Não foi possível carregar matérias.');
+      setSubjectLoadStatus("error");
+      setSubjectError(
+        error instanceof ApiError
+          ? error.message
+          : "Não foi possível carregar matérias.",
+      );
     }
   }, []);
 
@@ -186,7 +245,10 @@ export function useTimerController(): TimerController {
 
   /** Aplica uma duração vinda de preset ou dos botões +/-, e reflete na digitação. */
   function setCountdownTotal(totalSeconds: number): void {
-    const next = Math.min(MAX_TIMER_SECONDS, Math.max(MIN_TIMER_SECONDS, totalSeconds));
+    const next = Math.min(
+      MAX_TIMER_SECONDS,
+      Math.max(MIN_TIMER_SECONDS, totalSeconds),
+    );
     setCountdownDurationSeconds(next);
     setCountdownRemainingSeconds(next);
     setCountdownSegmentStartRemainingSeconds(next);
@@ -194,9 +256,9 @@ export function useTimerController(): TimerController {
   }
 
   function setEntryDigits(value: string): void {
-    const onlyDigits = value.replace(/\D/g, '');
+    const onlyDigits = value.replace(/\D/g, "");
     // Zeros à esquerda não mudam o valor e comeriam as casas disponíveis.
-    const trimmed = onlyDigits.replace(/^0+/, '').slice(-ENTRY_MAX_DIGITS);
+    const trimmed = onlyDigits.replace(/^0+/, "").slice(-ENTRY_MAX_DIGITS);
 
     const total = digitsToSeconds(trimmed);
 
@@ -221,7 +283,12 @@ export function useTimerController(): TimerController {
       return;
     }
 
-    setRegisterPrompt({ visible: true, source, seconds, subjectId: selectedSubjectId });
+    setRegisterPrompt({
+      visible: true,
+      source,
+      seconds,
+      subjectId: selectedSubjectId,
+    });
   }
 
   useEffect(() => {
@@ -242,10 +309,14 @@ export function useTimerController(): TimerController {
     if (countdownRunning && countdownRemainingSeconds === 0) {
       setCountdownRunning(false);
       const studied = countdownSegmentStartRemainingSeconds;
-      openRegisterPrompt('TIMER', studied);
+      openRegisterPrompt("TIMER", studied);
       setCountdownSegmentStartRemainingSeconds(0);
     }
-  }, [countdownRemainingSeconds, countdownRunning, countdownSegmentStartRemainingSeconds]);
+  }, [
+    countdownRemainingSeconds,
+    countdownRunning,
+    countdownSegmentStartRemainingSeconds,
+  ]);
 
   useEffect(() => {
     if (!stopwatchRunning) {
@@ -261,23 +332,87 @@ export function useTimerController(): TimerController {
     };
   }, [stopwatchRunning]);
 
-  function switchMode(nextMode: TimerMode): void {
-    setMode(nextMode);
-
-    if (nextMode === 'timer') {
-      setStopwatchRunning(false);
+  useEffect(() => {
+    if (!pomodoroRunning) {
       return;
     }
 
+    const intervalId = setInterval(() => {
+      setPomodoroRemainingSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [pomodoroRunning]);
+
+  useEffect(() => {
+    if (!pomodoroRunning || pomodoroRemainingSeconds > 0) {
+      return;
+    }
+
+    if (pomodoroPhase === "focus") {
+      const completedFocuses = pomodoroCompletedFocuses + 1;
+      const nextPhase =
+        completedFocuses % POMODORO_LONG_BREAK_INTERVAL === 0
+          ? "longBreak"
+          : "shortBreak";
+
+      setPomodoroCompletedFocuses(completedFocuses);
+      openRegisterPrompt("TIMER", pomodoroSegmentStartSeconds);
+      setPomodoroPhase(nextPhase);
+      const nextDuration =
+        nextPhase === "longBreak"
+          ? pomodoroSeconds(pomodoroLongBreakMinutes, DEFAULT_POMODORO_LONG_BREAK_MINUTES * 60)
+          : pomodoroSeconds(
+              pomodoroShortBreakMinutes,
+              DEFAULT_POMODORO_SHORT_BREAK_MINUTES * 60,
+            );
+      setPomodoroRemainingSeconds(nextDuration);
+      setPomodoroSegmentStartSeconds(nextDuration);
+      return;
+    }
+
+    setPomodoroPhase("focus");
+    const focusSeconds = pomodoroSeconds(
+      pomodoroFocusMinutes,
+      DEFAULT_POMODORO_FOCUS_MINUTES * 60,
+    );
+    setPomodoroRemainingSeconds(focusSeconds);
+    setPomodoroSegmentStartSeconds(focusSeconds);
+  }, [
+    pomodoroCompletedFocuses,
+    pomodoroPhase,
+    pomodoroRemainingSeconds,
+    pomodoroRunning,
+    pomodoroSegmentStartSeconds,
+    pomodoroFocusMinutes,
+    pomodoroLongBreakMinutes,
+    pomodoroShortBreakMinutes,
+  ]);
+
+  function switchMode(nextMode: TimerMode): void {
+    setMode(nextMode);
     setCountdownRunning(false);
+    setStopwatchRunning(false);
+    setPomodoroRunning(false);
+
+    if (nextMode === "timer") {
+      return;
+    }
+
+    if (nextMode === "cronometro") {
+      return;
+    }
   }
 
   function startOrPauseCountdown(): void {
     if (countdownRunning) {
       setCountdownRunning(false);
-      const studied = countdownSegmentStartRemainingSeconds - countdownRemainingSeconds;
+      const studied =
+        countdownSegmentStartRemainingSeconds - countdownRemainingSeconds;
       setCountdownSegmentStartRemainingSeconds(countdownRemainingSeconds);
-      openRegisterPrompt('TIMER', studied);
+      openRegisterPrompt("TIMER", studied);
       return;
     }
 
@@ -317,7 +452,7 @@ export function useTimerController(): TimerController {
       setStopwatchRunning(false);
       const studied = stopwatchSeconds - stopwatchSegmentStartSeconds;
       setStopwatchSegmentStartSeconds(stopwatchSeconds);
-      openRegisterPrompt('STOPWATCH', studied);
+      openRegisterPrompt("STOPWATCH", studied);
       return;
     }
 
@@ -336,7 +471,9 @@ export function useTimerController(): TimerController {
     const segmentSeconds = stopwatchSeconds - stopwatchSegmentStartSeconds;
 
     if (segmentSeconds <= 0) {
-      setRegisterFeedback('Inicie o cronômetro e aguarde alguns segundos antes de marcar.');
+      setRegisterFeedback(
+        "Inicie o cronômetro e aguarde alguns segundos antes de marcar.",
+      );
       return;
     }
 
@@ -354,8 +491,67 @@ export function useTimerController(): TimerController {
     );
   }
 
+  function startOrPausePomodoro(): void {
+    if (pomodoroRunning) {
+      setPomodoroRunning(false);
+
+      if (pomodoroPhase === "focus") {
+        const studied = pomodoroSegmentStartSeconds - pomodoroRemainingSeconds;
+        setPomodoroSegmentStartSeconds(pomodoroRemainingSeconds);
+        openRegisterPrompt("TIMER", studied);
+      }
+
+      return;
+    }
+
+    setPomodoroSegmentStartSeconds(pomodoroRemainingSeconds);
+    setPomodoroRunning(true);
+  }
+
+  function resetPomodoro(): void {
+    setPomodoroRunning(false);
+    setPomodoroPhase("focus");
+    const focusSeconds = pomodoroSeconds(
+      pomodoroFocusMinutes,
+      DEFAULT_POMODORO_FOCUS_MINUTES * 60,
+    );
+    setPomodoroRemainingSeconds(focusSeconds);
+    setPomodoroSegmentStartSeconds(focusSeconds);
+    setPomodoroCompletedFocuses(0);
+  }
+
+  function updatePomodoroDuration(
+    kind: "focus" | "shortBreak" | "longBreak",
+    value: string,
+  ): void {
+    const digits = value.replace(/\D/g, "").slice(0, 3);
+
+    if (kind === "focus") {
+      setPomodoroFocusMinutesState(digits);
+    } else if (kind === "shortBreak") {
+      setPomodoroShortBreakMinutesState(digits);
+    } else {
+      setPomodoroLongBreakMinutesState(digits);
+    }
+
+    if (!pomodoroRunning && digits !== "" && Number(digits) > 0) {
+      setPomodoroPhase("focus");
+      setPomodoroCompletedFocuses(0);
+      const focusSeconds =
+        kind === "focus"
+          ? Number(digits) * 60
+          : pomodoroSeconds(pomodoroFocusMinutes, DEFAULT_POMODORO_FOCUS_MINUTES * 60);
+      setPomodoroRemainingSeconds(focusSeconds);
+      setPomodoroSegmentStartSeconds(focusSeconds);
+    }
+  }
+
   async function confirmRegisterStudyTime(): Promise<void> {
-    if (!registerPrompt.visible || registeringStudyTime || registerPrompt.seconds <= 0) {
+    if (
+      !registerPrompt.visible ||
+      registeringStudyTime ||
+      registerPrompt.seconds <= 0
+    ) {
       return;
     }
 
@@ -366,7 +562,9 @@ export function useTimerController(): TimerController {
       await registerStudyTime({
         seconds: registerPrompt.seconds,
         source: registerPrompt.source,
-        ...(registerPrompt.subjectId === null ? {} : { subjectId: registerPrompt.subjectId }),
+        ...(registerPrompt.subjectId === null
+          ? {}
+          : { subjectId: registerPrompt.subjectId }),
       });
 
       setRegisterFeedback(null);
@@ -375,7 +573,7 @@ export function useTimerController(): TimerController {
       setRegisterFeedback(
         error instanceof ApiError
           ? error.message
-          : 'Não foi possível registrar seu tempo agora. Tente novamente.',
+          : "Não foi possível registrar seu tempo agora. Tente novamente.",
       );
     } finally {
       setRegisteringStudyTime(false);
@@ -396,7 +594,10 @@ export function useTimerController(): TimerController {
     }
 
     const elapsed = countdownDurationSeconds - countdownRemainingSeconds;
-    return Math.min(100, Math.max(0, (elapsed / countdownDurationSeconds) * 100));
+    return Math.min(
+      100,
+      Math.max(0, (elapsed / countdownDurationSeconds) * 100),
+    );
   }, [countdownDurationSeconds, countdownRemainingSeconds]);
 
   const canEditDuration =
@@ -436,7 +637,8 @@ export function useTimerController(): TimerController {
     entryFormatted: formatEntry(entryDigits),
     setEntryDigits,
     canEditDuration,
-    canStartCountdown: countdownRunning || digitsToSeconds(entryDigits) >= MIN_TIMER_SECONDS,
+    canStartCountdown:
+      countdownRunning || digitsToSeconds(entryDigits) >= MIN_TIMER_SECONDS,
 
     stopwatchSeconds,
     stopwatchRunning,
@@ -445,5 +647,39 @@ export function useTimerController(): TimerController {
     startOrPauseStopwatch,
     resetStopwatch,
     markStopwatchLap,
+
+    pomodoroPhase,
+    pomodoroRemainingSeconds,
+    pomodoroRunning,
+    pomodoroFormatted: formatClockDuration(pomodoroRemainingSeconds),
+    pomodoroProgressPercent: (() => {
+      const duration =
+        pomodoroPhase === "focus"
+          ? pomodoroSeconds(pomodoroFocusMinutes, DEFAULT_POMODORO_FOCUS_MINUTES * 60)
+          : pomodoroPhase === "longBreak"
+            ? pomodoroSeconds(
+                pomodoroLongBreakMinutes,
+                DEFAULT_POMODORO_LONG_BREAK_MINUTES * 60,
+              )
+            : pomodoroSeconds(
+                pomodoroShortBreakMinutes,
+                DEFAULT_POMODORO_SHORT_BREAK_MINUTES * 60,
+              );
+      return Math.min(
+        100,
+        Math.max(0, ((duration - pomodoroRemainingSeconds) / duration) * 100),
+      );
+    })(),
+    pomodoroCompletedFocuses,
+    pomodoroFocusMinutes,
+    pomodoroShortBreakMinutes,
+    pomodoroLongBreakMinutes,
+    setPomodoroFocusMinutes: (value) => updatePomodoroDuration("focus", value),
+    setPomodoroShortBreakMinutes: (value) =>
+      updatePomodoroDuration("shortBreak", value),
+    setPomodoroLongBreakMinutes: (value) =>
+      updatePomodoroDuration("longBreak", value),
+    startOrPausePomodoro,
+    resetPomodoro,
   };
 }

@@ -1,17 +1,4 @@
-type MonthlyStudyTimeResponse = {
-  totalSeconds: number;
-  daysStudied: number;
-  days: {
-    date: string;
-    seconds: number;
-  }[];
-  subjects: {
-    subjectId: string | null;
-    name: string;
-    seconds: number;
-    color: string | null;
-  }[];
-};
+import type { MonthlyStudyTimeResponse } from '@study-flow/shared';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card, ScreenContainer } from '@/components/ui';

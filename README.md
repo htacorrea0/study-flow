@@ -56,24 +56,24 @@ O Study Flow resolve isso em quatro movimentos:
 
 ## 2. Stack
 
-| Camada | Tecnologia | Por quê |
-|---|---|---|
-| Mobile | React Native + Expo (SDK 58) | Um código para Android e iOS, e o Expo Go permite testar no celular sem build nativo. |
-| Navegação | Expo Router | Rotas por arquivo, no mesmo modelo de pastas do resto do projeto. |
-| HTTP (mobile) | Axios | Interceptors centralizam token e tratamento de erro num lugar só. |
-| Notificações | Expo Notifications | Lembretes locais sem depender de serviço pago. |
-| Backend | Node.js + Express 5 | Simples, previsível, e o Express 5 já encaminha erros de `async` sozinho. |
-| Linguagem | TypeScript (modo estrito) | Contrato entre app e API verificado em tempo de compilação. |
-| ORM | Prisma 7 | Migrations versionadas e client tipado a partir do schema. |
-| Banco | PostgreSQL 18 | Relacional, que é a natureza do domínio (usuário → matéria → avaliação → conteúdo). |
-| Validação | Zod 4 | Valida a entrada e já gera o tipo — sem duplicar a definição. |
-| Autenticação | JWT + Argon2id | Padrão para API sem estado; Argon2id é a recomendação atual para hash de senha. |
-| IA | Google Gemini (API REST, sem SDK) | Lê o plano de aulas (PDF, foto ou texto) e devolve um plano de estudos estruturado. A chave fica só no backend. |
-| Upload | Multer (em memória) | Recebe o arquivo do plano de aulas e repassa ao Gemini sem gravar nada no servidor. |
-| Arquivos no app | expo-document-picker | Seletor de arquivos do sistema, para anexar o plano de aulas no chat. |
-| Cache local | AsyncStorage | Guarda no aparelho os planos da IA anteriores, para as matérias não perderem o que estudar. |
-| Testes | Vitest + Supertest | Roda TypeScript sem configuração extra; Supertest testa as rotas sem abrir porta. |
-| Repositório | npm workspaces | App, API e contratos compartilhados no mesmo repositório. |
+| Camada          | Tecnologia                        | Por quê                                                                                                         |
+| --------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Mobile          | React Native + Expo (SDK 58)      | Um código para Android e iOS, e o Expo Go permite testar no celular sem build nativo.                           |
+| Navegação       | Expo Router                       | Rotas por arquivo, no mesmo modelo de pastas do resto do projeto.                                               |
+| HTTP (mobile)   | Axios                             | Interceptors centralizam token e tratamento de erro num lugar só.                                               |
+| Notificações    | Expo Notifications                | Lembretes locais sem depender de serviço pago.                                                                  |
+| Backend         | Node.js + Express 5               | Simples, previsível, e o Express 5 já encaminha erros de `async` sozinho.                                       |
+| Linguagem       | TypeScript (modo estrito)         | Contrato entre app e API verificado em tempo de compilação.                                                     |
+| ORM             | Prisma 7                          | Migrations versionadas e client tipado a partir do schema.                                                      |
+| Banco           | PostgreSQL 18                     | Relacional, que é a natureza do domínio (usuário → matéria → avaliação → conteúdo).                             |
+| Validação       | Zod 4                             | Valida a entrada e já gera o tipo — sem duplicar a definição.                                                   |
+| Autenticação    | JWT + Argon2id                    | Padrão para API sem estado; Argon2id é a recomendação atual para hash de senha.                                 |
+| IA              | Google Gemini (API REST, sem SDK) | Lê o plano de aulas (PDF, foto ou texto) e devolve um plano de estudos estruturado. A chave fica só no backend. |
+| Upload          | Multer (em memória)               | Recebe o arquivo do plano de aulas e repassa ao Gemini sem gravar nada no servidor.                             |
+| Arquivos no app | expo-document-picker              | Seletor de arquivos do sistema, para anexar o plano de aulas no chat.                                           |
+| Cache local     | AsyncStorage                      | Guarda no aparelho os planos da IA anteriores, para as matérias não perderem o que estudar.                     |
+| Testes          | Vitest + Supertest                | Roda TypeScript sem configuração extra; Supertest testa as rotas sem abrir porta.                               |
+| Repositório     | npm workspaces                    | App, API e contratos compartilhados no mesmo repositório.                                                       |
 
 As justificativas completas, incluindo o que foi descartado e por quê, estão
 em [`docs/decisoes-arquiteturais.md`](docs/decisoes-arquiteturais.md). Os
@@ -84,13 +84,13 @@ estão em [`docs/design-system.md`](docs/design-system.md).
 
 ## 3. Pré-requisitos
 
-| Ferramenta | Versão mínima | Como conferir |
-|---|---|---|
-| Node.js | 20 (recomendado 22+) | `node --version` |
-| npm | 10 | `npm --version` |
-| Docker + Docker Compose | Compose v2.17 | `docker --version` e `docker compose version` |
-| Git | qualquer recente | `git --version` |
-| Conta Google | — | Só para o assistente com IA: gera a chave gratuita do Gemini em [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey). |
+| Ferramenta              | Versão mínima        | Como conferir                                                                                                                             |
+| ----------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js                 | 20 (recomendado 22+) | `node --version`                                                                                                                          |
+| npm                     | 10                   | `npm --version`                                                                                                                           |
+| Docker + Docker Compose | Compose v2.17        | `docker --version` e `docker compose version`                                                                                             |
+| Git                     | qualquer recente     | `git --version`                                                                                                                           |
+| Conta Google            | —                    | Só para o assistente com IA: gera a chave gratuita do Gemini em [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey). |
 
 No celular:
 
@@ -295,41 +295,41 @@ responsabilidade e o que **não** pode entrar nela.
 
 ### `.env` (raiz) — lido pelo Docker Compose
 
-| Variável | Exemplo | Para quê |
-|---|---|---|
-| `POSTGRES_USER` | `studyflow` | Usuário do banco de desenvolvimento |
+| Variável            | Exemplo                  | Para quê                                |
+| ------------------- | ------------------------ | --------------------------------------- |
+| `POSTGRES_USER`     | `studyflow`              | Usuário do banco de desenvolvimento     |
 | `POSTGRES_PASSWORD` | `studyflow_dev_password` | Senha local. Não é segredo de produção. |
-| `POSTGRES_DB` | `studyflow` | Nome do banco |
-| `POSTGRES_PORT` | `5432` | Porta exposta na sua máquina |
+| `POSTGRES_DB`       | `studyflow`              | Nome do banco                           |
+| `POSTGRES_PORT`     | `5432`                   | Porta exposta na sua máquina            |
 
 > Se já existir um PostgreSQL ocupando a 5432 na sua máquina, troque
 > `POSTGRES_PORT` aqui **e** a porta na `DATABASE_URL` em `apps/api/.env`.
 
 ### `apps/api/.env`
 
-| Variável | Exemplo | Para quê |
-|---|---|---|
-| `NODE_ENV` | `development` | Ambiente |
-| `PORT` | `3333` | Porta da API |
-| `HOST` | `0.0.0.0` | **Mantenha assim.** Com `127.0.0.1` a API só aceita conexões da própria máquina e o celular nunca alcança. |
-| `DATABASE_URL` | `postgresql://studyflow:studyflow_dev_password@localhost:5432/studyflow?schema=public` | Conexão com o banco |
-| `JWT_SECRET` | (gerado, 32+ caracteres) | Assinatura dos tokens |
-| `JWT_EXPIRES_IN` | `7d` | Validade do token |
-| `CORS_ORIGIN` | `*` | Origens permitidas. Em produção, restringir. |
-| `GEMINI_API_KEY` | (gerada no AI Studio) | **Opcional.** Chave do Gemini para o assistente de estudos. Vazia = assistente desligado, resto da API normal. |
-| `GEMINI_MODEL` | `gemini-flash-lite-latest` | Modelo principal. Qual responde melhor para a sua chave: `npm run gemini:check`. |
-| `GEMINI_FALLBACK_MODELS` | `gemini-flash-latest` | Modelos reserva, separados por vírgula, usados quando o principal está sobrecarregado ou sem cota. |
-| `GEMINI_THINKING_LEVEL` | `low` | Quanto o modelo "pensa": `minimal`, `low`, `medium`, `high` ou `default`. `low` mantém as respostas em segundos. |
-| `GEMINI_TIMEOUT_SECONDS` | `60` | Tempo máximo de uma tentativa no Gemini. |
-| `GEMINI_TOTAL_TIMEOUT_SECONDS` | `150` | Prazo total de uma mensagem, somando novas tentativas e o modelo reserva. |
+| Variável                       | Exemplo                                                                                | Para quê                                                                                                         |
+| ------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                     | `development`                                                                          | Ambiente                                                                                                         |
+| `PORT`                         | `3333`                                                                                 | Porta da API                                                                                                     |
+| `HOST`                         | `0.0.0.0`                                                                              | **Mantenha assim.** Com `127.0.0.1` a API só aceita conexões da própria máquina e o celular nunca alcança.       |
+| `DATABASE_URL`                 | `postgresql://studyflow:studyflow_dev_password@localhost:5432/studyflow?schema=public` | Conexão com o banco                                                                                              |
+| `JWT_SECRET`                   | (gerado, 32+ caracteres)                                                               | Assinatura dos tokens                                                                                            |
+| `JWT_EXPIRES_IN`               | `7d`                                                                                   | Validade do token                                                                                                |
+| `CORS_ORIGIN`                  | `*`                                                                                    | Origens permitidas. Em produção, restringir.                                                                     |
+| `GEMINI_API_KEY`               | (gerada no AI Studio)                                                                  | **Opcional.** Chave do Gemini para o assistente de estudos. Vazia = assistente desligado, resto da API normal.   |
+| `GEMINI_MODEL`                 | `gemini-flash-lite-latest`                                                             | Modelo principal. Qual responde melhor para a sua chave: `npm run gemini:check`.                                 |
+| `GEMINI_FALLBACK_MODELS`       | `gemini-flash-latest`                                                                  | Modelos reserva, separados por vírgula, usados quando o principal está sobrecarregado ou sem cota.               |
+| `GEMINI_THINKING_LEVEL`        | `low`                                                                                  | Quanto o modelo "pensa": `minimal`, `low`, `medium`, `high` ou `default`. `low` mantém as respostas em segundos. |
+| `GEMINI_TIMEOUT_SECONDS`       | `60`                                                                                   | Tempo máximo de uma tentativa no Gemini.                                                                         |
+| `GEMINI_TOTAL_TIMEOUT_SECONDS` | `150`                                                                                  | Prazo total de uma mensagem, somando novas tentativas e o modelo reserva.                                        |
 
 > A chave do Gemini é segredo: nunca vai para o app (`EXPO_PUBLIC_`) nem para
 > o git. Se ela vazar (print, chat, commit), apague-a no AI Studio e gere outra.
 
 ### `apps/mobile/.env`
 
-| Variável | Exemplo | Para quê |
-|---|---|---|
+| Variável              | Exemplo                    | Para quê                                                                                                                                     |
+| --------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `EXPO_PUBLIC_API_URL` | `http://192.168.0.10:3333` | **Opcional.** Se ficar vazia, o app descobre sozinho o IP da máquina que está rodando o Metro. Preencha só para apontar para outro ambiente. |
 
 ### Gerando um segredo
@@ -397,7 +397,7 @@ npm run db:reset     # APAGA o volume e recria o banco do zero
 ```
 
 > `db:reset` destrói os dados locais sem confirmação. É a saída para
-> migration com conflito (*drift*) ou banco em estado estranho.
+> migration com conflito (_drift_) ou banco em estado estranho.
 
 ---
 
@@ -486,7 +486,7 @@ New-NetFirewallRule -DisplayName "Study Flow API" -Direction Inbound -LocalPort 
 Se o Metro também não for alcançado, repita para a porta `8081`.
 
 > Use `-Profile Private`. Se o Windows classificou sua rede Wi-Fi como
-> "Pública", mude para "Privada" em *Configurações → Rede e Internet* — é mais
+> "Pública", mude para "Privada" em _Configurações → Rede e Internet_ — é mais
 > seguro do que liberar a porta em rede pública.
 
 ### Checagem do ambiente do app
@@ -502,24 +502,24 @@ npm run -w @study-flow/mobile doctor
 Todos rodam **na raiz do repositório** e funcionam igual em Linux, macOS e
 Windows.
 
-| Script | O que faz |
-|---|---|
-| `npm run setup` | Instala, sobe o banco e aplica as migrations |
-| `npm run dev:api` | Banco + migrations + API em modo watch |
-| `npm run dev:mobile` | Metro bundler (QR code do Expo Go) |
-| `npm run db:up` | Sobe o PostgreSQL e espera ficar saudável |
-| `npm run db:down` | Para o PostgreSQL preservando os dados |
-| `npm run db:reset` | Apaga o volume e recria o banco do zero |
-| `npm run db:migrate -- --name x` | Cria uma migration nova |
-| `npm run db:deploy` | Aplica as migrations pendentes |
-| `npm run db:status` | Mostra o estado das migrations |
-| `npm run db:generate` | Regenera o client do Prisma |
-| `npm run db:studio` | Abre o Prisma Studio |
-| `npm run db:logs` | Acompanha os logs do PostgreSQL |
-| `npm run gemini:check` | Diagnóstico do Gemini: chave, conexão, modelos liberados, tempo de resposta e o que pôr no `.env` |
-| `npm run typecheck` | Verifica tipos nos três workspaces |
-| `npm test` | Roda os testes da API |
-| `npm run test:watch` | Testes em modo watch |
+| Script                           | O que faz                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `npm run setup`                  | Instala, sobe o banco e aplica as migrations                                                      |
+| `npm run dev:api`                | Banco + migrations + API em modo watch                                                            |
+| `npm run dev:mobile`             | Metro bundler (QR code do Expo Go)                                                                |
+| `npm run db:up`                  | Sobe o PostgreSQL e espera ficar saudável                                                         |
+| `npm run db:down`                | Para o PostgreSQL preservando os dados                                                            |
+| `npm run db:reset`               | Apaga o volume e recria o banco do zero                                                           |
+| `npm run db:migrate -- --name x` | Cria uma migration nova                                                                           |
+| `npm run db:deploy`              | Aplica as migrations pendentes                                                                    |
+| `npm run db:status`              | Mostra o estado das migrations                                                                    |
+| `npm run db:generate`            | Regenera o client do Prisma                                                                       |
+| `npm run db:studio`              | Abre o Prisma Studio                                                                              |
+| `npm run db:logs`                | Acompanha os logs do PostgreSQL                                                                   |
+| `npm run gemini:check`           | Diagnóstico do Gemini: chave, conexão, modelos liberados, tempo de resposta e o que pôr no `.env` |
+| `npm run typecheck`              | Verifica tipos nos três workspaces                                                                |
+| `npm test`                       | Roda os testes da API                                                                             |
+| `npm run test:watch`             | Testes em modo watch                                                                              |
 
 ---
 
@@ -535,20 +535,20 @@ Roda em qualquer máquina, inclusive sem Docker no ar. O `app.ts` é separado do
 `server.ts`, então o Supertest exercita as rotas sem abrir porta, e o que
 depende do banco fica mockado.
 
-| Arquivo | O que cobre |
-|---|---|
-| `tests/HealthRoutes.test.ts` | Rotas de saúde respondem; rota inexistente devolve `404` no formato padrão de erro. |
-| `tests/ErrorHandlerMiddleware.test.ts` | Cada tipo de `AppError` vira o status HTTP certo; erro de validação devolve `422` com a lista de campos; erro não previsto vira `500` sem vazar detalhe interno. |
-| `tests/security/password.test.ts` | O hash nunca é a senha; `verify` aceita a correta e rejeita a errada; dois hashes da mesma senha diferem (salt). |
-| `tests/security/token.test.ts` | Token assinado verifica; assinatura adulterada, token expirado e segredo errado falham. |
-| `tests/AuthService.test.ts` | Com o model mockado: e-mail já cadastrado vira `ConflictError`; usuário inexistente e senha errada produzem a **mesma** mensagem; e-mail com maiúsculas e espaços é normalizado antes da busca. |
-| `tests/AuthRoutes.test.ts` | Contrato das três rotas de auth, `422` com `issues`, `401` sem Bearer e `passwordHash` ausente de toda resposta. |
-| `tests/passwordPolicy.test.ts` | A política de senha aceita o que deve aceitar e recusa o que falta maiúscula, minúscula, caractere especial ou tamanho; o que falta vira uma mensagem só; o login não aplica a política. |
-| `tests/RateLimitMiddleware.test.ts` | A janela deslizante libera dentro do limite e devolve `429` ao estourar. |
-| `tests/AiRoutes.test.ts` | Chat do assistente: multipart com e sem arquivo, PDF enviado como `octet-stream` reconhecido pela extensão, `.docx` recusado com `400`, `422` quando a última mensagem não é da pessoa, `401` sem Bearer. |
-| `tests/AiStudyPlanService.test.ts` | Com o Gemini mockado: o arquivo é anexado à última mensagem com o contexto do app (disponibilidade e matérias); o plano é normalizado (dias em ordem, total recalculado); resposta fora do formato vira texto sem quebrar. |
-| `tests/geminiClient.test.ts` | Com o `fetch` mockado: upload resumível, novas tentativas em `503`, troca para o modelo reserva em tempo esgotado e `429`, repetição sem `thinkingLevel` quando o modelo recusa, modelo travado evitado por 5 min, chave inválida sem novas tentativas. |
-| `tests/SavedStudyPlanRoutes.test.ts` / `SavedStudyPlanService.test.ts` | `GET/PUT/DELETE /ai/study-plan`: valida o plano, salva por dono, `204` ao remover; registro antigo incompatível vira `plan: null`. |
+| Arquivo                                                                | O que cobre                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/HealthRoutes.test.ts`                                           | Rotas de saúde respondem; rota inexistente devolve `404` no formato padrão de erro.                                                                                                                                                                     |
+| `tests/ErrorHandlerMiddleware.test.ts`                                 | Cada tipo de `AppError` vira o status HTTP certo; erro de validação devolve `422` com a lista de campos; erro não previsto vira `500` sem vazar detalhe interno.                                                                                        |
+| `tests/security/password.test.ts`                                      | O hash nunca é a senha; `verify` aceita a correta e rejeita a errada; dois hashes da mesma senha diferem (salt).                                                                                                                                        |
+| `tests/security/token.test.ts`                                         | Token assinado verifica; assinatura adulterada, token expirado e segredo errado falham.                                                                                                                                                                 |
+| `tests/AuthService.test.ts`                                            | Com o model mockado: e-mail já cadastrado vira `ConflictError`; usuário inexistente e senha errada produzem a **mesma** mensagem; e-mail com maiúsculas e espaços é normalizado antes da busca.                                                         |
+| `tests/AuthRoutes.test.ts`                                             | Contrato das três rotas de auth, `422` com `issues`, `401` sem Bearer e `passwordHash` ausente de toda resposta.                                                                                                                                        |
+| `tests/passwordPolicy.test.ts`                                         | A política de senha aceita o que deve aceitar e recusa o que falta maiúscula, minúscula, caractere especial ou tamanho; o que falta vira uma mensagem só; o login não aplica a política.                                                                |
+| `tests/RateLimitMiddleware.test.ts`                                    | A janela deslizante libera dentro do limite e devolve `429` ao estourar.                                                                                                                                                                                |
+| `tests/AiRoutes.test.ts`                                               | Chat do assistente: multipart com e sem arquivo, PDF enviado como `octet-stream` reconhecido pela extensão, `.docx` recusado com `400`, `422` quando a última mensagem não é da pessoa, `401` sem Bearer.                                               |
+| `tests/AiStudyPlanService.test.ts`                                     | Com o Gemini mockado: o arquivo é anexado à última mensagem com o contexto do app (disponibilidade e matérias); o plano é normalizado (dias em ordem, total recalculado); resposta fora do formato vira texto sem quebrar.                              |
+| `tests/geminiClient.test.ts`                                           | Com o `fetch` mockado: upload resumível, novas tentativas em `503`, troca para o modelo reserva em tempo esgotado e `429`, repetição sem `thinkingLevel` quando o modelo recusa, modelo travado evitado por 5 min, chave inválida sem novas tentativas. |
+| `tests/SavedStudyPlanRoutes.test.ts` / `SavedStudyPlanService.test.ts` | `GET/PUT/DELETE /ai/study-plan`: valida o plano, salva por dono, `204` ao remover; registro antigo incompatível vira `plan: null`.                                                                                                                      |
 
 ### Com banco de verdade
 
@@ -669,7 +669,8 @@ Nomes de arquivo e organização de pastas:
   da agenda daquele dia. Avaliação não depende de plano ativo: o anel aparece
   mesmo num mês sem sessão marcada.
 - Navegação por abas: Início, Matérias, Calendário, Timer e Progresso.
-  Timer e Progresso ainda são telas em branco, e dizem isso.
+  A aba Timer reúne timer regressivo, cronômetro livre e Pomodoro, com seleção
+  de matéria e registro do tempo estudado.
 - **Seed** com dados fictícios (`npm run db:seed`): um usuário de
   demonstração com matérias, avaliações, disponibilidade e progresso
   suficiente para uma sequência real. O plano não é mais escrito à mão: o
@@ -699,6 +700,11 @@ Nomes de arquivo e organização de pastas:
   uma data específica substitui os minutos habituais daquele dia, refaz o
   planejamento e exibe avisos de conflito. A tela permite cadastrar,
   justificar e remover exceções.
+- **Registro de tempo estudado** (`POST /activities/study-time` e
+  `GET /activities/study-time/monthly`): timer, cronômetro e Pomodoro registram
+  o tempo por matéria e alimentam os resumos mensais de progresso. O Pomodoro
+  começa com ciclos de 5 minutos de foco, 1 minuto de pausa curta e 2 minutos
+  de pausa longa, com durações editáveis na tela.
 - **Profundidade de estudo** por conteúdo (básico, intermediário ou intenso):
   decide em quantos dias diferentes aquele assunto é agendado, de uma a três
   passadas, com a revisão custando metade do esforço da primeira passada. É
@@ -730,14 +736,15 @@ Nomes de arquivo e organização de pastas:
 ### O que ainda não existe
 
 **Interface**
-- Cronômetro Pomodoro, tela de progresso e tela de perfil. Timer e Progresso
-  abrem uma tela em branco.
+
+- Tela de perfil.
 - Arrastar uma atividade para outro dia. A redistribuição é automática; não
   há edição manual da grade.
 - Recuperação de senha, onboarding e login com Google ou Apple.
 - Foto de perfil. O avatar mostra as iniciais do nome.
 
 **Backend**
+
 - Notificações agendadas.
 - Materiais de apoio (`StudyResource`): a tabela existe, nenhuma rota a usa.
 - Revogação de sessão no servidor. Não há refresh token nem tabela de
@@ -746,6 +753,7 @@ Nomes de arquivo e organização de pastas:
   seção 11.
 
 **Integrações**
+
 - Busca de conteúdo no YouTube ou na internet.
 - As sessões do plano da IA não entram no calendário automaticamente: o
   plano aparece na aba Matérias como recomendação, e o calendário continua
@@ -753,6 +761,7 @@ Nomes de arquivo e organização de pastas:
 - Qualquer API externa.
 
 **Testes**
+
 - O app mobile ainda não tem runner de testes. A aritmética do calendário
   (`apps/mobile/src/utils/date.ts`) e as telas novas foram conferidas à mão;
   o gate automatizado do workspace é o `tsc --noEmit`.
@@ -805,7 +814,7 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-### Migration com conflito (*drift*)
+### Migration com conflito (_drift_)
 
 Acontece quando o banco local não bate com o histórico de migrations —
 normalmente depois de alterar o schema sem gerar a migration, ou de trocar de
@@ -845,7 +854,7 @@ O client gerado ficou velho:
 npm run db:generate
 ```
 
-### O `npm install` avisa sobre *install scripts*
+### O `npm install` avisa sobre _install scripts_
 
 ```
 npm warn install-scripts 3 packages have install scripts not yet covered by allowScripts
@@ -905,7 +914,6 @@ maiúsculas nem acentos). Se o plano chama a matéria de "Cálculo Diferencial" 
 o app de "Cálculo I", eles não se encontram: renomeie a matéria no app ou peça
 ao assistente para usar o mesmo nome e aplique o plano de novo.
 
-
 ---
 
 ## 15. Assistente de estudos com Gemini
@@ -934,28 +942,28 @@ ao assistente para usar o mesmo nome e aplique o plano de novo.
 
 ### Onde mexer
 
-| Quero… | Arquivo |
-|---|---|
-| Mudar o comportamento da IA (regras, tom, exemplos) | `apps/api/src/prompts/studyPlanPrompt.ts` |
-| Mudar novas tentativas, prazos e modelo reserva | `apps/api/src/integrations/gemini/geminiClient.ts` e `.env` |
-| Mudar o formato do plano | `packages/shared/src/types/aiStudyPlan.ts` + schema no prompt + `_studyPlanCard.tsx` |
-| Mudar o chat | `apps/mobile/src/views/studyAssistant/` e `controllers/studyAssistant/` |
-| Mudar como o plano aparece nas Matérias | `apps/mobile/src/views/subjects/_aiPlanCard.tsx`, `_aiGuidance.tsx`, `_subjectRow.tsx` |
+| Quero…                                              | Arquivo                                                                                |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Mudar o comportamento da IA (regras, tom, exemplos) | `apps/api/src/prompts/studyPlanPrompt.ts`                                              |
+| Mudar novas tentativas, prazos e modelo reserva     | `apps/api/src/integrations/gemini/geminiClient.ts` e `.env`                            |
+| Mudar o formato do plano                            | `packages/shared/src/types/aiStudyPlan.ts` + schema no prompt + `_studyPlanCard.tsx`   |
+| Mudar o chat                                        | `apps/mobile/src/views/studyAssistant/` e `controllers/studyAssistant/`                |
+| Mudar como o plano aparece nas Matérias             | `apps/mobile/src/views/subjects/_aiPlanCard.tsx`, `_aiGuidance.tsx`, `_subjectRow.tsx` |
 
 ### Endpoints
 
-| Método e rota | O que faz |
-|---|---|
+| Método e rota              | O que faz                                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `POST /ai/study-plan/chat` | `multipart/form-data`: `payload` (JSON com o histórico) e `file` opcional. Limite de 30 mensagens a cada 10 min por IP. |
-| `GET /ai/study-plan` | Plano aplicado pela pessoa, ou `{ plan: null }`. |
-| `PUT /ai/study-plan` | Guarda (ou substitui) o plano aplicado. |
-| `DELETE /ai/study-plan` | Remove o plano aplicado (as matérias ficam). |
+| `GET /ai/study-plan`       | Plano aplicado pela pessoa, ou `{ plan: null }`.                                                                        |
+| `PUT /ai/study-plan`       | Guarda (ou substitui) o plano aplicado.                                                                                 |
+| `DELETE /ai/study-plan`    | Remove o plano aplicado (as matérias ficam).                                                                            |
 
 Todas exigem login.
 
 ### Como treinar o assistente
 
-Não é preciso *fine-tuning*: o comportamento se ajusta em
+Não é preciso _fine-tuning_: o comportamento se ajusta em
 `apps/api/src/prompts/studyPlanPrompt.ts`, com regras concretas na instrução
 de sistema e, principalmente, exemplos de pergunta e resposta ideal. O passo a
 passo, a arquitetura completa, limites e custos do plano gratuito estão em
