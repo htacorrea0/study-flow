@@ -50,9 +50,19 @@ App  ◀── { reply, studyPlan, attachment } ──────────�
 - A conversa vive na memória do app; a API não guarda nada.
 - O arquivo sobe uma vez; as mensagens seguintes levam só a referência (`fileUri`).
   O Google mantém o arquivo por **48 h** — depois disso, "Nova conversa".
-- O plano chega estruturado e vira um cartão. O botão **Aplicar plano nas Matérias**
-  cadastra as matérias que ainda não existem e guarda o plano no banco
-  (tabela `ai_study_plans`, um por pessoa; aplicar outro substitui).
+- O plano chega estruturado e vira um cartão. O botão **Aplicar plano no calendário** chama
+  `POST /ai/study-plan/apply`: cadastra as matérias que ainda não existem, cria as
+  avaliações que a IA encontrou no material, vira os tópicos em conteúdos ligados à
+  avaliação mais próxima de cada matéria, recalcula o cronograma e guarda o plano no
+  banco (tabela `ai_study_plans`, um por pessoa; aplicar outro substitui). Aplicar o
+  mesmo plano duas vezes não duplica matéria nem avaliação.
+- **Sem data não há calendário.** O planejador agenda a partir de avaliações com
+  prazo, então o app pergunta a data de cada matéria que a IA não datou antes de
+  aplicar. Quem não informa fica com as matérias cadastradas e lê, em uma linha, por
+  que o calendário não mudou. Data no passado é descartada.
+- Se a disponibilidade da semana estiver toda zerada, o app oferece preenchê-la com os
+  minutos por dia do plano. Oferece: disponibilidade cadastrada à mão nunca é
+  sobrescrita.
 - Na aba **Matérias** aparecem o resumo do plano e, em cada matéria, o tempo por
   semana, a prioridade e os primeiros conteúdos. Ao abrir a matéria, o quadro
   **O que estudar** mostra todos os conteúdos, o motivo da prioridade e os dias da

@@ -274,19 +274,19 @@ dica e a validação não tenham como divergir.
 | `5:36` | **login** | **Implementada** |
 | (sem nó) | **cadastro** | **Implementada.** Não existe no Figma: derivada do login, sem inventar elemento visual novo |
 | `5:84` | **home-dashboard** | **Implementada** |
-| `5:168` | subjects | Futuro. A aba Matérias existe e abre uma tela em branco |
+| `5:168` | **subjects** | **Implementada.** Lista de matérias, avaliações, conteúdos e o resumo do plano da IA |
 | `5:874` | **calendar-schedule** | **Implementada.** Cobre "calendário" e "detalhe do dia" |
-| `5:438` | progress-stats | Futuro. A aba Progresso existe e abre uma tela em branco |
-| `5:1129` | profile-settings | Futuro. Onde mora a disponibilidade semanal |
-| `5:303` | study-timer (Pomodoro) | **Fora do enunciado.** A aba Timer existe e abre uma tela em branco |
+| `5:438` | **progress-stats** | **Implementada.** Acumulado do mês, por dia e por matéria |
+| `5:1129` | **profile-settings** | **Implementada em parte.** A disponibilidade semanal tem tela própria, com as exceções por dia; o perfil (nome, fuso, foto) ainda não existe |
+| `5:303` | **study-timer (Pomodoro)** | **Implementada.** A aba Timer registra o tempo, credita a sessão do dia e tem os ciclos de foco e descanso |
 | `5:371` | flashcards | **Fora do enunciado** |
 | `5:542` | notes | **Fora do enunciado** |
 | `5:1222` | achievements | **Fora do enunciado** |
 | `5:1310` | study-groups | **Fora do enunciado** |
 
-Cinco das doze telas são funcionalidades que o documento do projeto não
-descreve. Elas ficam registradas aqui como material visual reaproveitável, e
-**não** como backlog.
+Quatro das doze telas — flashcards, notas, conquistas e grupos de estudo —
+são funcionalidades que o documento do projeto não descreve. Ficam
+registradas aqui como material visual reaproveitável, e **não** como backlog.
 
 ### 5.1 A barra de abas
 
@@ -296,17 +296,14 @@ cabem nos 370px úteis: cada aba passou a `flex: 1`. Altura 72, borda superior
 `border`, glow `px 16 py 4` com raio 16 em `primaryGlow`, ícone 20 e rótulo 11
 seguem o arquivo.
 
-Matérias, Timer e Progresso abrem a mesma tela em branco
-(`views/_templates/_emptyScreen.tsx`), que diz em uma linha que a tela chega
-numa próxima etapa. O botão de sair da conta mora provisoriamente no rodapé da
-aba Progresso, até a tela de perfil existir.
+As cinco abas têm tela de verdade. O "Sair da conta" segue provisoriamente no
+rodapé do Progresso, à espera da tela de perfil.
 
 ### 5.2 As divergências aceitas
 
-As sete divergências deliberadas entre o Figma e o que foi implementado
-(horário da sessão, foto de perfil, ícone por matéria, botão de voltar do
-calendário, número de abas, as três letras do cabeçalho da grade e o anel que
-marca o dia da prova) estão
+As divergências deliberadas entre o Figma e o que foi implementado (horário
+da sessão, ícone por matéria, botão de voltar do calendário, número de abas,
+as três letras do cabeçalho da grade e o anel que marca o dia da prova) estão
 justificadas uma a uma em
 [`decisoes-arquiteturais.md`](decisoes-arquiteturais.md), seção 12.4.
 

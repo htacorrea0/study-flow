@@ -46,8 +46,10 @@ O Study Flow resolve isso em quatro movimentos:
    estudar para cada avaliação.
 2. **Disponibilidade** — quantos minutos a pessoa tem por dia da semana, mais
    exceções para dias específicos.
-3. **Plano** — o sistema distribui os conteúdos pelos dias disponíveis até a
-   data de cada avaliação, respeitando prioridade e esforço estimado.
+3. **Plano** — o sistema monta um cronograma que cabe no tempo que existe:
+   encolhe os conteúdos na proporção da intensidade escolhida quando não dá
+   para estudar tudo, divide cada dia entre as provas por urgência e adianta
+   de leve o que é pesado na prova distante.
 4. **Recálculo** — conforme as atividades são concluídas, adiadas ou marcadas
    como não realizadas, o plano é regerado — **sem perder o histórico de
    progresso já registrado**.
@@ -56,24 +58,24 @@ O Study Flow resolve isso em quatro movimentos:
 
 ## 2. Stack
 
-| Camada          | Tecnologia                        | Por quê                                                                                                         |
-| --------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Mobile          | React Native + Expo (SDK 58)      | Um código para Android e iOS, e o Expo Go permite testar no celular sem build nativo.                           |
-| Navegação       | Expo Router                       | Rotas por arquivo, no mesmo modelo de pastas do resto do projeto.                                               |
-| HTTP (mobile)   | Axios                             | Interceptors centralizam token e tratamento de erro num lugar só.                                               |
-| Notificações    | Expo Notifications                | Lembretes locais sem depender de serviço pago.                                                                  |
-| Backend         | Node.js + Express 5               | Simples, previsível, e o Express 5 já encaminha erros de `async` sozinho.                                       |
-| Linguagem       | TypeScript (modo estrito)         | Contrato entre app e API verificado em tempo de compilação.                                                     |
-| ORM             | Prisma 7                          | Migrations versionadas e client tipado a partir do schema.                                                      |
-| Banco           | PostgreSQL 18                     | Relacional, que é a natureza do domínio (usuário → matéria → avaliação → conteúdo).                             |
-| Validação       | Zod 4                             | Valida a entrada e já gera o tipo — sem duplicar a definição.                                                   |
-| Autenticação    | JWT + Argon2id                    | Padrão para API sem estado; Argon2id é a recomendação atual para hash de senha.                                 |
-| IA              | Google Gemini (API REST, sem SDK) | Lê o plano de aulas (PDF, foto ou texto) e devolve um plano de estudos estruturado. A chave fica só no backend. |
-| Upload          | Multer (em memória)               | Recebe o arquivo do plano de aulas e repassa ao Gemini sem gravar nada no servidor.                             |
-| Arquivos no app | expo-document-picker              | Seletor de arquivos do sistema, para anexar o plano de aulas no chat.                                           |
-| Cache local     | AsyncStorage                      | Guarda no aparelho os planos da IA anteriores, para as matérias não perderem o que estudar.                     |
-| Testes          | Vitest + Supertest                | Roda TypeScript sem configuração extra; Supertest testa as rotas sem abrir porta.                               |
-| Repositório     | npm workspaces                    | App, API e contratos compartilhados no mesmo repositório.                                                       |
+| Camada | Tecnologia | Por quê |
+|---|---|---|
+| Mobile | React Native + Expo (SDK 58) | Um código para Android e iOS, e o Expo Go permite testar no celular sem build nativo. |
+| Navegação | Expo Router | Rotas por arquivo, no mesmo modelo de pastas do resto do projeto. |
+| HTTP (mobile) | Axios | Interceptors centralizam token e tratamento de erro num lugar só. |
+| Notificações | Expo Notifications | Instalado e configurado no `app.json`, ainda sem lembrete implementado. Entra quando houver lembrete de sessão. |
+| Backend | Node.js + Express 5 | Simples, previsível, e o Express 5 já encaminha erros de `async` sozinho. |
+| Linguagem | TypeScript (modo estrito) | Contrato entre app e API verificado em tempo de compilação. |
+| ORM | Prisma 7 | Migrations versionadas e client tipado a partir do schema. |
+| Banco | PostgreSQL 18 | Relacional, que é a natureza do domínio (usuário → matéria → avaliação → conteúdo). |
+| Validação | Zod 4 | Valida a entrada e já gera o tipo — sem duplicar a definição. |
+| Autenticação | JWT + Argon2id | Padrão para API sem estado; Argon2id é a recomendação atual para hash de senha. |
+| IA | Google Gemini (API REST, sem SDK) | Lê o plano de aulas (PDF, foto ou texto) e devolve um plano de estudos estruturado. A chave fica só no backend. |
+| Upload | Multer (em memória) | Recebe o arquivo do plano de aulas e repassa ao Gemini sem gravar nada no servidor. |
+| Arquivos no app | expo-document-picker | Seletor de arquivos do sistema, para anexar o plano de aulas no chat. |
+| Cache local | AsyncStorage | Guarda no aparelho os planos da IA anteriores, para as matérias não perderem o que estudar. |
+| Testes | Vitest + Supertest | Roda TypeScript sem configuração extra; Supertest testa as rotas sem abrir porta. |
+| Repositório | npm workspaces | App, API e contratos compartilhados no mesmo repositório. |
 
 As justificativas completas, incluindo o que foi descartado e por quê, estão
 em [`docs/decisoes-arquiteturais.md`](docs/decisoes-arquiteturais.md). Os
@@ -307,24 +309,31 @@ responsabilidade e o que **não** pode entrar nela.
 
 ### `apps/api/.env`
 
-| Variável                       | Exemplo                                                                                | Para quê                                                                                                         |
-| ------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                     | `development`                                                                          | Ambiente                                                                                                         |
-| `PORT`                         | `3333`                                                                                 | Porta da API                                                                                                     |
-| `HOST`                         | `0.0.0.0`                                                                              | **Mantenha assim.** Com `127.0.0.1` a API só aceita conexões da própria máquina e o celular nunca alcança.       |
-| `DATABASE_URL`                 | `postgresql://studyflow:studyflow_dev_password@localhost:5432/studyflow?schema=public` | Conexão com o banco                                                                                              |
-| `JWT_SECRET`                   | (gerado, 32+ caracteres)                                                               | Assinatura dos tokens                                                                                            |
-| `JWT_EXPIRES_IN`               | `7d`                                                                                   | Validade do token                                                                                                |
-| `CORS_ORIGIN`                  | `*`                                                                                    | Origens permitidas. Em produção, restringir.                                                                     |
-| `GEMINI_API_KEY`               | (gerada no AI Studio)                                                                  | **Opcional.** Chave do Gemini para o assistente de estudos. Vazia = assistente desligado, resto da API normal.   |
-| `GEMINI_MODEL`                 | `gemini-flash-lite-latest`                                                             | Modelo principal. Qual responde melhor para a sua chave: `npm run gemini:check`.                                 |
-| `GEMINI_FALLBACK_MODELS`       | `gemini-flash-latest`                                                                  | Modelos reserva, separados por vírgula, usados quando o principal está sobrecarregado ou sem cota.               |
-| `GEMINI_THINKING_LEVEL`        | `low`                                                                                  | Quanto o modelo "pensa": `minimal`, `low`, `medium`, `high` ou `default`. `low` mantém as respostas em segundos. |
-| `GEMINI_TIMEOUT_SECONDS`       | `60`                                                                                   | Tempo máximo de uma tentativa no Gemini.                                                                         |
-| `GEMINI_TOTAL_TIMEOUT_SECONDS` | `150`                                                                                  | Prazo total de uma mensagem, somando novas tentativas e o modelo reserva.                                        |
+| Variável | Exemplo | Para quê |
+|---|---|---|
+| `NODE_ENV` | `development` | Ambiente |
+| `PORT` | `3333` | Porta da API |
+| `HOST` | `0.0.0.0` | **Mantenha assim.** Com `127.0.0.1` a API só aceita conexões da própria máquina e o celular nunca alcança. |
+| `DATABASE_URL` | `postgresql://studyflow:studyflow_dev_password@localhost:5432/studyflow?schema=public` | Conexão com o banco |
+| `JWT_SECRET` | (gerado, 32+ caracteres) | Assinatura dos tokens |
+| `JWT_EXPIRES_IN` | `7d` | Validade do token |
+| `CORS_ORIGIN` | `*` | Origens permitidas. Em produção, restringir. |
+| `GEMINI_API_KEY` | (gerada no AI Studio) | **Opcional.** Chave do Gemini para o assistente de estudos. Vazia = assistente desligado, resto da API normal. |
+| `GEMINI_MODEL` | `gemini-flash-lite-latest` | Modelo principal. Qual responde melhor para a sua chave: `npm run gemini:check`. |
+| `GEMINI_FALLBACK_MODELS` | `gemini-flash-latest` | Modelos reserva, separados por vírgula, usados quando o principal está sobrecarregado ou sem cota. |
+| `GEMINI_THINKING_LEVEL` | `low` | Quanto o modelo "pensa": `minimal`, `low`, `medium`, `high` ou `default`. `low` mantém as respostas em segundos. |
+| `GEMINI_TIMEOUT_SECONDS` | `60` | Tempo máximo de uma tentativa no Gemini. |
+| `GEMINI_TOTAL_TIMEOUT_SECONDS` | `150` | Prazo total de uma mensagem, somando novas tentativas e o modelo reserva. |
+| `YOUTUBE_API_KEY` | (vazio) | **Opcional.** YouTube Data API v3, para as sugestões de material. |
 
-> A chave do Gemini é segredo: nunca vai para o app (`EXPO_PUBLIC_`) nem para
-> o git. Se ela vazar (print, chat, commit), apague-a no AI Studio e gere outra.
+> As duas chaves são opcionais e independentes: sem a do Gemini o assistente
+> responde 503, sem a do YouTube a tela de sessão avisa que não há material
+> para listar, e em ambos os casos o resto da API sobe normalmente. O passo a
+> passo de onde tirá-las está em `apps/api/.env.example`.
+>
+> As duas são segredo: nunca vão para o app (`EXPO_PUBLIC_`) nem para o git.
+> Se uma vazar (print, chat, commit), apague-a no console do Google e gere
+> outra.
 
 ### `apps/mobile/.env`
 
@@ -502,24 +511,25 @@ npm run -w @study-flow/mobile doctor
 Todos rodam **na raiz do repositório** e funcionam igual em Linux, macOS e
 Windows.
 
-| Script                           | O que faz                                                                                         |
-| -------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `npm run setup`                  | Instala, sobe o banco e aplica as migrations                                                      |
-| `npm run dev:api`                | Banco + migrations + API em modo watch                                                            |
-| `npm run dev:mobile`             | Metro bundler (QR code do Expo Go)                                                                |
-| `npm run db:up`                  | Sobe o PostgreSQL e espera ficar saudável                                                         |
-| `npm run db:down`                | Para o PostgreSQL preservando os dados                                                            |
-| `npm run db:reset`               | Apaga o volume e recria o banco do zero                                                           |
-| `npm run db:migrate -- --name x` | Cria uma migration nova                                                                           |
-| `npm run db:deploy`              | Aplica as migrations pendentes                                                                    |
-| `npm run db:status`              | Mostra o estado das migrations                                                                    |
-| `npm run db:generate`            | Regenera o client do Prisma                                                                       |
-| `npm run db:studio`              | Abre o Prisma Studio                                                                              |
-| `npm run db:logs`                | Acompanha os logs do PostgreSQL                                                                   |
-| `npm run gemini:check`           | Diagnóstico do Gemini: chave, conexão, modelos liberados, tempo de resposta e o que pôr no `.env` |
-| `npm run typecheck`              | Verifica tipos nos três workspaces                                                                |
-| `npm test`                       | Roda os testes da API                                                                             |
-| `npm run test:watch`             | Testes em modo watch                                                                              |
+| Script | O que faz |
+|---|---|
+| `npm run setup` | Instala, sobe o banco e aplica as migrations |
+| `npm run dev:api` | Banco + migrations + API em modo watch |
+| `npm run dev:mobile` | Metro bundler (QR code do Expo Go) |
+| `npm run db:up` | Sobe o PostgreSQL e espera ficar saudável |
+| `npm run db:down` | Para o PostgreSQL preservando os dados |
+| `npm run db:reset` | Apaga o volume e recria o banco do zero |
+| `npm run db:migrate -- --name x` | Cria uma migration nova |
+| `npm run db:deploy` | Aplica as migrations pendentes |
+| `npm run db:status` | Mostra o estado das migrations |
+| `npm run db:generate` | Regenera o client do Prisma |
+| `npm run db:studio` | Abre o Prisma Studio |
+| `npm run db:logs` | Acompanha os logs do PostgreSQL |
+| `npm run gemini:check` | Diagnóstico do Gemini: chave, conexão, modelos liberados, tempo de resposta e o que pôr no `.env` |
+| `npm run typecheck` | Verifica tipos nos três workspaces |
+| `npm test` | Roda os testes da API |
+| `npm run test:watch` | Testes em modo watch |
+| `npm run -w @study-flow/api check:busca` | Confere se a chave de sugestão de material responde |
 
 ---
 
@@ -672,8 +682,15 @@ Nomes de arquivo e organização de pastas:
   da agenda daquele dia. Avaliação não depende de plano ativo: o anel aparece
   mesmo num mês sem sessão marcada.
 - Navegação por abas: Início, Matérias, Calendário, Timer e Progresso.
-  A aba Timer reúne timer regressivo, cronômetro livre e Pomodoro, com seleção
-  de matéria e registro do tempo estudado.
+  O Timer mede e registra o tempo estudado, com ciclos Pomodoro; o Progresso
+  reúne o acumulado do mês, por dia e por matéria.
+- **O cronômetro fecha a sessão do plano.** Ao parar, dá para dizer de qual
+  sessão do dia aquele tempo foi. Quando o acumulado alcança a duração
+  prevista, a sessão vira estudada sozinha; abaixo disso ela fica em
+  andamento, com os minutos já somados, e fecha quando completar. Para a meta
+  do dia não contar o mesmo estudo duas vezes, a soma do dashboard considera
+  do cronômetro só o que **não** foi creditado a uma sessão — o resto já
+  chega pelo progresso.
 - **Seed** com dados fictícios (`npm run db:seed`): um usuário de
   demonstração com matérias, avaliações, disponibilidade e progresso
   suficiente para uma sequência real. O plano não é mais escrito à mão: o
@@ -687,15 +704,31 @@ Nomes de arquivo e organização de pastas:
   filtrando por dono. Apagar matéria com avaliação devolve 409 em vez de
   arrastar dados junto.
 - **Algoritmo de distribuição** de verdade:
-  `domain/planning/deadlineFirstPlanner.ts`, versão `deadline-first-v1`.
-  Função pura: prazo mais apertado escolhe dia primeiro, cada conteúdo cai
-  inteiro no dia mais vazio da janela, e o que não cabe é encaixado com
-  aviso em vez de sumir.
+  `domain/planning/deadlineFirstPlanner.ts`, versão `deadline-first-v2`.
+  Função pura: a demanda de cada prova é encolhida até caber no tempo livre
+  até o prazo dela, mantendo entre os conteúdos a proporção de intensidade
+  que a pessoa escolheu; cada dia é rateado pelo ritmo que cada prova exige,
+  com a maior fatia para quem vence antes e o resto adiantando o que vem
+  depois. Mudar qualquer coisa que entre na conta refaz o cronograma inteiro.
+  O que nem no tempo mínimo por sessão cabe é encaixado com aviso em vez de
+  sumir.
 - **Confirmação do dia** (`POST /activities/confirmations`): a pessoa marca o
   que estudou e o que não estudou, e o que ficou de fora é redistribuído nos
   dias que ainda restam até o prazo daquela avaliação. Só hoje e dias
   passados podem ser confirmados, e o progresso é lançado no dia confirmado,
   não no instante do toque.
+- **Dia que passou em silêncio conta como estudado.** Quem não abre o app no
+  fim do dia não está pedindo para o cronograma inteiro reapertar: o plano só
+  é refeito quando a pessoa diz que **não** estudou, em qualquer dia anterior
+  a hoje. A tela do dia abre com tudo marcado e ela desmarca o que falhou. A
+  presunção é uma leitura do plano, nunca um progresso inventado: o
+  histórico e os minutos estudados continuam tendo só o que ela afirmou.
+- **Sugestões de material** (`GET /activities/:activityId`): tocar no card do
+  dia abre a sessão com vídeos de aula e de exercício resolvido buscados no
+  YouTube, gravados em `StudyResource` por conteúdo. Cada passada mostra uma
+  fatia diferente do acervo, então estudar o mesmo assunto três dias seguidos
+  não traz o mesmo vídeo três vezes. A chave de busca é opcional: sem ela a
+  tela explica que as sugestões dependem da configuração, em vez de falhar.
 - Telas de **matérias**, **avaliação com conteúdos** e **disponibilidade**,
   mais o painel "O que você estudou?" dentro da agenda do dia, com o
   "Marcar todas" de três estados.
@@ -716,11 +749,26 @@ Nomes de arquivo e organização de pastas:
   passadas, com a revisão custando metade do esforço da primeira passada. É
   escolhida assunto a assunto dentro da prova, porque o domínio varia na
   mesma matéria: o capítulo já sabido pede uma passada e o que trava pede
-  três. Mudar a profundidade de um conteúdo remonta o plano daquela avaliação
-  e avisa se o estudo não couber no tempo livre.
+  três. Mudar a profundidade de um conteúdo remonta o cronograma e avisa se o
+  estudo não couber no tempo livre.
 - **Apagar** matéria e avaliação. A avaliação leva junto os conteúdos e as
   sessões dela; a matéria só sai depois que as avaliações saem, e a recusa
   vem com a razão em vez de um erro seco.
+- **Dias diferentes da semana** (`/availability/exceptions`): o ajuste de uma
+  data só, que vale no lugar do tempo daquele dia da semana. Zero minuto
+  marca o dia como livre e tira as sessões dele. A data é a chave da rota, e
+  salvar a mesma data de novo corrige o ajuste em vez de criar outro. Dá para
+  chegar lá pela tela de disponibilidade ou pela agenda do dia no calendário,
+  que abre a tela com a data já preenchida. Só de hoje em diante: ajustar
+  ontem não muda plano nenhum.
+- **O aviso de "não cabe" vale enquanto a causa existir** (`GET
+  /plan/conflicts`): ele é gravado no plano ativo, não na tela. Mexer no tempo
+  da semana, no tempo de um dia, na data da prova, nos conteúdos ou confirmar
+  o dia refaz o plano e, com ele, a lista de avisos. O aviso some sozinho de
+  todas as telas quando passa a caber, aparece quando deixa de caber e
+  atualiza o número quando o déficit muda de 60 para 40 minutos. São dois
+  avisos diferentes: "cabe, mas em ritmo reduzido", em tom de informação com
+  o percentual, e "nem apertando dá", com os minutos que faltam.
 
 **Assistente de estudos com Gemini:**
 
@@ -730,10 +778,21 @@ Nomes de arquivo e organização de pastas:
   um plano semanal com matérias, prioridade, tempo por matéria, conteúdos,
   sessões por dia e dicas, respeitando a disponibilidade cadastrada no app.
   Dá para pedir ajustes na conversa ("tira o sábado").
-- **Aplicar plano nas Matérias**: cadastra as matérias que faltam e guarda o
-  plano. Na aba Matérias aparecem o resumo do plano e, em cada matéria, o
-  tempo semanal, a prioridade e o que estudar; ao abrir a matéria, o quadro
-  "O que estudar" mostra os conteúdos e os dias da semana.
+- **Aplicar plano no calendário** (`POST /ai/study-plan/apply`): cadastra as
+  matérias que faltam, cria as avaliações que a IA encontrou no material, vira
+  os tópicos em conteúdos ligados a elas e remonta o cronograma. Na aba
+  Matérias continuam o resumo do plano e, em cada matéria, o tempo semanal, a
+  prioridade e o que estudar; ao abrir a matéria, o quadro "O que estudar"
+  mostra os conteúdos e os dias da semana.
+- **Sem data não há calendário.** O planejador é deadline-first: ele agenda o
+  que está preso a uma avaliação com data. Por isso, antes de aplicar, o app
+  pergunta a data de cada matéria que a IA não datou. Quem prefere não
+  informar segue com as matérias cadastradas, e a resposta explica em uma
+  linha por que o calendário não se moveu.
+- Se a disponibilidade da semana estiver toda zerada, o app **oferece**
+  preencher com os minutos por dia do plano da IA. Oferece, não impõe:
+  sobrescrever o que foi cadastrado à mão seria apagar uma decisão de quem
+  estuda.
 - Planos anteriores ficam no aparelho: a matéria que o plano novo não cobre
   continua com as indicações do plano em que aparecia.
 - Resiliência ao plano gratuito do Google: novas tentativas, modelo reserva e
@@ -743,27 +802,29 @@ Nomes de arquivo e organização de pastas:
 
 **Interface**
 
+- Exceção que **repete** ("todo sábado de novembro") ou faixa de datas de uma
+  vez: férias de quinze dias ainda é um dia por vez.
 - Arrastar uma atividade para outro dia. A redistribuição é automática; não
   há edição manual da grade.
-- Recuperação de senha, onboarding e login com Google ou Apple.
-- Foto de perfil. O avatar mostra as iniciais do nome.
+- Recuperação de senha, troca de senha, troca de e-mail, onboarding e login
+  com Google ou Apple.
 
 **Backend**
 
 - Notificações agendadas.
-- Materiais de apoio (`StudyResource`): a tabela existe, nenhuma rota a usa.
 - Revogação de sessão no servidor. Não há refresh token nem tabela de
   sessões; o logout apaga o token no aparelho. O motivo e a contrapartida
   estão em [`docs/decisoes-arquiteturais.md`](docs/decisoes-arquiteturais.md),
   seção 11.
 
 **Integrações**
-
-- Busca de conteúdo no YouTube ou na internet.
-- As sessões do plano da IA não entram no calendário automaticamente: o
-  plano aparece na aba Matérias como recomendação, e o calendário continua
-  sendo montado pelas provas, conteúdos e disponibilidade cadastrados.
-- Qualquer API externa.
+- Rebusca periódica do material: o acervo de um conteúdo é montado uma vez e
+  não envelhece sozinho.
+- Adicionar link próprio, marcar link como já visto ou abrir o vídeo dentro do
+  app.
+- Busca de material fora do YouTube (artigo, lista de exercícios, curso). O
+  contrato de provedor em `apps/api/src/providers/ResourceSearchProvider.ts`
+  aceita outros, mas só o do YouTube está implementado.
 
 **Testes**
 
@@ -960,9 +1021,10 @@ ao assistente para usar o mesmo nome e aplique o plano de novo.
 | Método e rota              | O que faz                                                                                                               |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `POST /ai/study-plan/chat` | `multipart/form-data`: `payload` (JSON com o histórico) e `file` opcional. Limite de 30 mensagens a cada 10 min por IP. |
-| `GET /ai/study-plan`       | Plano aplicado pela pessoa, ou `{ plan: null }`.                                                                        |
-| `PUT /ai/study-plan`       | Guarda (ou substitui) o plano aplicado.                                                                                 |
-| `DELETE /ai/study-plan`    | Remove o plano aplicado (as matérias ficam).                                                                            |
+| `GET /ai/study-plan` | Plano aplicado pela pessoa, ou `{ plan: null }`. |
+| `PUT /ai/study-plan` | Guarda (ou substitui) o plano aplicado. |
+| `DELETE /ai/study-plan` | Remove o plano aplicado (as matérias ficam). |
+| `POST /ai/study-plan/apply` | Aplica o plano: cria as matérias que faltam, as avaliações (com as datas que a IA achou ou as que a pessoa informou), os conteúdos a partir dos tópicos, e recalcula o cronograma. Repetir não duplica nada. |
 
 Todas exigem login.
 

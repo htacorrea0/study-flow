@@ -131,9 +131,8 @@ Estados: `PLANNED` (ainda vai acontecer), `IN_PROGRESS`, `DONE`, `SKIPPED`
 ### 5.4 Isolamento por usuário na raiz de cada agregado
 
 `userId` está em `Subject`, `Assessment`, `StudyAvailability`,
-`AvailabilityException`, `StudyPlan`, `StudyProgress` e
-`NotificationPreference`. `StudyContent` e `StudyResource` chegam ao usuário
-através da avaliação.
+`AvailabilityException`, `StudyPlan`, `StudyProgress` e `StudyTimeEntry`.
+`StudyContent` e `StudyResource` chegam ao usuário através da avaliação.
 
 **Regra permanente:** toda consulta filtra por `userId`. O helper
 `assertOwnership` em `src/middlewares/AuthenticateMiddleware.ts` existe para o caso em
@@ -201,7 +200,7 @@ Recalcular o plano é chamar `plan` de novo com o estado atual. Não existe
 | Senha só como hash Argon2id | Nunca em texto puro, em lugar nenhum. O campo no banco se chama `passwordHash` para não restar dúvida. |
 | `@node-rs/argon2` em vez de `argon2` | Mesmo algoritmo. O `@node-rs` distribui binário pronto para Linux, Windows e macOS; o outro exige `node-gyp` e Visual Studio Build Tools. Num time em sistemas diferentes, isso é a diferença entre instalar e não instalar. |
 | `JWT_SECRET` validado com mínimo de 32 caracteres | A API se recusa a subir com segredo fraco ou ausente, com mensagem explicando como gerar um. Falhar no boot é melhor do que falhar em produção. |
-| Nenhum segredo no mobile | Tudo com prefixo `EXPO_PUBLIC_` é embutido no bundle e fica legível para quem tiver o APK. Só a URL pública da API vai ali. Chaves de terceiros (YouTube, Gemini) ficarão exclusivamente no backend. |
+| Nenhum segredo no mobile | Tudo com prefixo `EXPO_PUBLIC_` é embutido no bundle e fica legível para quem tiver o APK. Só a URL pública da API vai ali. As chaves de terceiros (YouTube, Gemini) ficam só no backend, lidas em `src/config/env.ts`. |
 | `.env` fora do git, `.env.example` versionado | Os exemplos usam valores ilustrativos de desenvolvimento, nunca credenciais reais. |
 
 ---
@@ -553,9 +552,8 @@ mesmo que ela já faz na agenda do dia e no anel do prazo.
 ### 12.8 Sair da conta mora provisoriamente no Progresso
 
 O botão de sair vivia na tela placeholder que o dashboard substituiu. Ele foi
-para o rodapé da aba Progresso, que ainda é uma tela em branco, com comentário
-dizendo que o lugar dele é a tela de perfil. Sem isso, a única forma de sair
-seria limpar os dados do app.
+para o rodapé da aba Progresso, com comentário dizendo que o lugar dele é a
+tela de perfil. Sem isso, a única forma de sair seria limpar os dados do app.
 
 ### 12.9 O dia da prova é marcado à parte da sessão
 
@@ -599,20 +597,21 @@ nada marcado" é exatamente o que vale a pena saber.
 
 ## 13. Distribuição, recálculo e confirmação do dia
 
-### A heurística do `deadline-first-v1`
+### A heurística do `deadline-first`
 
-`domain/planning/deadlineFirstPlanner.ts` é a primeira implementação de
-`StudyPlanner`. Em ordem: descarta o que já foi concluído, agrupa os
-conteúdos por avaliação, processa as avaliações pelo prazo mais próximo e,
-dentro de cada uma, os conteúdos por prioridade e depois por esforço.
+`domain/planning/deadlineFirstPlanner.ts` é a implementação de
+`StudyPlanner`. Em ordem: descarta as passadas já concluídas, agrupa os
+conteúdos por avaliação, encolhe a demanda de cada avaliação até ela caber no
+tempo livre até o prazo e divide cada dia entre as avaliações por urgência. A
+conta da compressão e o rateio dos dias estão na seção 16; aqui ficam as
+escolhas que valem desde a primeira versão.
 
-Duas escolhas merecem registro.
-
-**O dia escolhido é o mais vazio, não o mais próximo.** Encher hoje até o
-limite e só então passar para amanhã produziria um plano tecnicamente válido
-e humanamente ruim: a pessoa estuda cinco horas na segunda e nada na quinta.
-Espalhar pelos dias com mais minutos livres distribui a carga e deixa folga
-para o imprevisto, que é o caso normal.
+**A carga é espalhada, não empilhada no começo.** Encher hoje até o limite e
+só então passar para amanhã produziria um plano tecnicamente válido e
+humanamente ruim: a pessoa estuda cinco horas na segunda e nada na quinta. Na
+`v1` isso vinha de escolher sempre o dia mais vazio; na `v2` vem do teto de
+ritmo (seção 16), e o dia mais vazio ficou só como destino da passada que não
+coube em cota nenhuma.
 
 **O conteúdo não é partido entre dois dias.** O conteúdo é a unidade de
 planejamento e o progresso é registrado contra ele: partir "Derivadas" em
@@ -621,28 +620,28 @@ como feita deixaria o banco sem resposta para "esse conteúdo está estudado?".
 Um conteúdo grande demais para um dia é um conteúdo mal cadastrado, e a
 pessoa resolve isso dividindo em dois, onde o app não precisa adivinhar.
 
-**"Encaixa e avisa" em vez de deixar conteúdo sem data.** Quando nada mais
-cabe, o conteúdo entra no dia mais vazio assim mesmo e o excedente vira um
-conflito `INSUFFICIENT_TIME` com o déficit em minutos. A alternativa seria
+**"Encaixa e avisa" em vez de deixar conteúdo sem data.** Quando nem o tempo
+mínimo por sessão cabe, o conteúdo entra no dia mais vazio assim mesmo e o
+excedente vira um conflito `INSUFFICIENT_TIME` com o déficit em minutos. A alternativa seria
 devolver o conteúdo em `unscheduledContentIds`, o que na tela vira um
 conteúdo que simplesmente não aparece em dia nenhum. Estourar o tempo é um
 fato que a pessoa precisa ver; sumir não é.
 
-### Por que o recálculo é escopado na avaliação
+### Por que o recálculo é global
 
-Marcar "não estudei" recalcula **só as sessões da avaliação afetada**. As
-outras matérias são copiadas para o plano novo nas mesmas datas, posições e
-status, e a capacidade de cada dia chega ao planner já descontada do que
-essas cópias ocupam.
+Todo recálculo refaz o futuro de todas as avaliações pendentes:
+`recalculate(userId, now)`, sem escopo. A primeira versão recalculava só a
+avaliação tocada e copiava as outras nas mesmas datas, para que mexer em
+Cálculo não remarcasse História. A compressão da `v2` tirou essa opção: o
+fator de cada avaliação depende da demanda de todas as que vencem antes dela
+(seção 16), então copiar as outras intactas devolveria um cronograma que
+contradiz a própria conta — incluir uma prova não apertaria as antigas, e
+apagar uma não devolveria o tempo às que ficaram.
 
-O motivo é de confiança, não de desempenho: quem deixou de estudar Cálculo na
-terça não espera encontrar História remarcada na quinta. Um replanejamento
-global a cada toque faria a grade inteira se mexer por um motivo que a pessoa
-não consegue relacionar com o que acabou de fazer, e um calendário que muda
-sozinho deixa de ser consultado.
-
-Mudar a disponibilidade é a exceção: ela muda o chão de todas as avaliações
-ao mesmo tempo, e aí o recálculo é `{ kind: 'all' }`.
+O que a cópia ainda preserva é o passado: `selecionarCopias` repete as
+atividades anteriores a hoje, com datas, posições e status. O que já
+aconteceu é histórico e não se replaneja; daqui para a frente é tudo
+redistribuído.
 
 Recalcular nunca sobrescreve. Cria um `StudyPlan` novo `ACTIVE` e marca o
 anterior como `SUPERSEDED`, na mesma transação, como o `schema.prisma` já
@@ -715,19 +714,17 @@ A migração `20261103010000_profundidade_por_conteudo` copia para cada
 conteúdo o valor que estava na matéria dele antes de derrubar a coluna, para
 que nenhum plano já montado mude de forma sozinho.
 
-Como todo mutador de conteúdo já termina em
-`PlanService.recalculate({ kind: 'assessment' })`, mudar a profundidade
-recalcula só aquela avaliação, sem nenhum caminho novo: a regra de que mexer
-numa prova não embaralha as outras continua valendo. O `PATCH /subjects/:id`
-voltou a devolver a matéria pura (`SubjectResponse`), porque nome e cor não
-mexem no plano e não há aviso para dar.
+Como todo mutador de conteúdo já termina em `PlanService.recalculate`, mudar
+a profundidade redistribui o plano inteiro sem nenhum caminho novo. O
+`PATCH /subjects/:id` voltou a devolver a matéria pura (`SubjectResponse`),
+porque nome e cor não mexem no plano e não há aviso para dar.
 
 ### Apagar: a avaliação leva o que é dela, a matéria não leva nada
 
 `DELETE /assessments/:id` apaga conteúdos e sessões junto, por cascade, e
-**não** recalcula: os dias que vagaram ficam vagos, e puxar o estudo das
-outras matérias para o buraco seria uma surpresa para quem só quis tirar uma
-prova da lista. `DELETE /subjects/:id` encosta no `onDelete: Restrict` do
+recalcula: apagar uma prova **libera** tempo, e as outras estavam comprimidas
+por causa dela. Deixar os dias vagos, como a versão anterior fazia, manteria
+o aperto depois que a causa sumiu. `DELETE /subjects/:id` encosta no `onDelete: Restrict` do
 schema e devolve 409 com a razão ("Esta matéria ainda tem provas ou
 trabalhos...") enquanto houver avaliação: apagar uma matéria é barato de
 pedir e caro de desfazer, e o histórico de estudo mora nas avaliações. Nas
@@ -754,3 +751,404 @@ registro histórico, não origem do que a tela mostra.
 `activityTitle.tituloDaPassada`, usada pelo planner na escrita, e
 `tituloComNomeAtual`, usada na leitura, ficam no mesmo arquivo justamente para
 que as duas frases nunca divirjam.
+
+## 14. Dias que fogem da semana
+
+### A chave da rota é a data, não um `id`
+
+`availability_exceptions` tem `@@unique([userId, date])`: por construção, uma
+pessoa tem no máximo um ajuste por dia. A rota foi desenhada em cima dessa
+chave — `PUT /availability/exceptions/:date` e `DELETE
+/availability/exceptions/:date` —, e não em cima de um `id` gerado.
+
+A razão é concreta e já custou caro neste projeto: com `id` na URL, o
+formulário precisa saber se está criando ou editando, e errar essa decisão
+grava um segundo registro em vez de corrigir o primeiro. Foi exatamente o que
+aconteceu com avaliação, que chegou a mostrar várias "AC1" da mesma matéria no
+calendário. Com a data na URL o `PUT` é idempotente pela forma: salvar o
+mesmo dia duas vezes cai no mesmo `upsert`, e a tela não guarda identificador
+nenhum.
+
+A contrapartida é que a chave é pública e igual para todo mundo — o dia 18 de
+novembro de A tem a mesma URL que o de B. Por isso o isolamento por `userId`
+não pode depender só de revisão: `apps/api/tests/integration/crud.int.test.ts`
+monta duas contas no mesmo banco e verifica que A não lê, não sobrescreve e
+não apaga o ajuste de B, e que o `DELETE` de A num dia que só B ajustou
+responde 404 sem apagar nada.
+
+### A exceção recalcula com escopo `all`
+
+As outras escritas recalculam o plano de uma avaliação só (`{ kind:
+'assessment', assessmentId }`), porque é o alcance real da mudança. O ajuste
+de um dia não tem esse alcance: encolher a terça-feira tira espaço de tudo o
+que estava marcado para aquela terça, de qualquer matéria. Recalcular só uma
+avaliação deixaria as outras ocupando um tempo que não existe mais. Por isso a
+exceção usa `{ kind: 'all' }`, a mesma coisa que salvar a semana já faz.
+
+### O cálculo não mudou
+
+`services/support/capacity.ts` já aplicava a regra antes de existir qualquer
+tela: a exceção de uma data **substitui** o valor do dia da semana, e dia com
+zero minuto sai da lista de dias de estudo. A etapa de escrita só preencheu a
+tabela que o cálculo já lia. É por isso que ela é pequena, e é a razão de a
+pendência ter sido registrada como "o cálculo lê, a interface não cria" em vez
+de ser tratada como funcionalidade nova.
+
+### Só de hoje em diante
+
+O `PUT` recusa data passada com 400, e a tela nem oferece o atalho na agenda
+de um dia que já passou. Ajustar ontem não muda plano nenhum: o passado já foi
+distribuído e, quando houve confirmação, já virou progresso. Aceitar a escrita
+daria à pessoa a impressão de estar corrigindo algo que o recálculo ignoraria.
+
+## 15. O aviso de "não cabe" é do plano, não da tela
+
+### Onde ele morava antes
+
+O aviso nascia na resposta de uma escrita (`PUT /availability`,
+`POST /assessments`, confirmação do dia), ia para um `useState` da tela e
+morria quando a tela desmontava. Nada era gravado, e nenhuma rota de leitura
+devolvia conflito. Quatro consequências, todas sentidas em uso:
+
+1. Salvar, ver o aviso, sair da tela e voltar fazia o aviso sumir — mesmo
+   continuando sem caber.
+2. Aumentar o tempo na Disponibilidade limpava o aviso ali, e o formulário da
+   avaliação continuava mostrando o antigo.
+3. Uma escrita escopada numa avaliação devolvia só os conflitos dela. Salvar
+   um conteúdo de Cálculo apagava, na tela, o aviso de Direito, que ninguém
+   tinha resolvido.
+4. O déficit não atualizava: faltavam 60 minutos, a pessoa mexia no tempo e
+   continuavam aparecendo 60 onde já eram 40.
+
+### A coluna fica no plano
+
+`study_plans.conflicts` (`Json`, default `[]`) guarda o conjunto de avisos da
+versão do plano. Não é tabela própria porque o conflito nasce e morre com a
+versão: `PlanService.recalculate` **sempre** aposenta o plano anterior e cria
+uma linha nova dentro da mesma transação. Guardado ali, o conjunto não tem
+como ficar velho — não existe caminho que grave plano sem gravar o aviso
+junto.
+
+A leitura é defensiva (`toStoredPlanConflicts`, em `dtos/PlanDto.ts`): uma
+coluna `Json` não tem forma garantida, e um plano gravado por uma versão
+anterior do código não pode derrubar a rota. O que não casa com
+`PLAN_CONFLICT_KINDS` é descartado em silêncio.
+
+### Os avisos do plano novo são os do recálculo, sem herança
+
+Como o recálculo é global (seção 13), o distribuidor sempre fala de todas as
+avaliações pendentes: o conjunto que ele devolve já é o conjunto completo, e
+não existe aviso de outra avaliação a herdar. Foi isso que tirou
+`mesclarConflitos` e `dropConflictsOfAssessment` do `PlanService` — apagar
+uma avaliação recalcula, e o aviso dela some porque ela saiu da conta, não
+porque alguém o podou.
+
+### Uma rota de leitura, não um campo em três respostas
+
+`GET /plan/conflicts` devolve `{ conflicts }` do plano ativo. A alternativa
+era pendurar `conflicts` em `GET /dashboard`, `GET /availability` e
+`GET /calendar/:date`, o que mudaria a forma de três contratos — e
+`AvailabilityResponse` é também o corpo do `PUT`. Como é um dado só, com um
+dono só, ele ganhou rota própria.
+
+Toda escrita que recalcula devolve `listConflicts(userId)`, e não o resultado
+do distribuidor: a resposta da mutação e a da leitura são, por construção, o
+mesmo conjunto.
+
+### No app, um contexto
+
+`PlanConflictsContext` guarda a lista e expõe `refresh()`, que delega para
+`services/plan/PlanService.ts` (contexto não faz regra de negócio). As três
+telas que mostram o aviso — Disponibilidade, formulário da avaliação e painel
+de confirmação do dia — leem dele e gravam nele o que a escrita devolveu, e
+chamam `refresh()` ao ganhar foco. É isso que faz o aviso aparecer ao
+**abrir** a tela, e não só depois de salvar. A lista é zerada quando a sessão
+deixa de estar autenticada.
+
+## 16. O cronograma que cabe no tempo que existe (`deadline-first-v2`)
+
+### O problema da `v1`
+
+A `v1` agendava cada passada com o esforço **cheio** no dia mais vazio antes
+do prazo. 150 minutos de conteúdo com 60 minutos livres viravam 150 minutos
+agendados e um alerta: um cronograma que a pessoa não tinha como cumprir, com
+um aviso dizendo que ela não teria. Pior, incluir uma prova nova não mexia na
+antiga — o recálculo escopado copiava as outras avaliações nas mesmas datas —
+e a prova que entrou ficava com as sobras.
+
+### A compressão é por avaliação, não por conteúdo
+
+A demanda ideal de um conteúdo é `esforço × soma dos pesos das passadas que
+faltam`. Somando os conteúdos, cada avaliação tem uma demanda ideal, e é ela
+que é multiplicada por um fator `f ≤ 1` até caber.
+
+O fator é da **avaliação** porque é dentro dela que a intensidade relativa
+importa: quem marcou um capítulo como intenso e outro como leve quer que o
+primeiro continue valendo o dobro do segundo mesmo quando o tempo encolhe.
+Um fator por conteúdo (por exemplo, cortar mais de quem tem mais minutos)
+achataria exatamente a escolha que a pessoa fez. 100/50 com 60 minutos livres
+vira 40/20; entrando um conteúdo de 30 na conta, vira 33/17/10.
+
+### O fator é o mínimo dos prazos que incluem a avaliação
+
+Com os prazos distintos em ordem `d₁ < d₂ < … < dₖ`:
+
+- `cap(dₖ)` = minutos livres entre hoje e `dₖ`;
+- `demandaPrefixo(dₖ)` = demanda ideal das avaliações com prazo até `dₖ`;
+- `gₖ = cap(dₖ) / demandaPrefixo(dₖ)`;
+- `fᵢ = min(1, min gₖ para todo k ≥ i)`.
+
+Cada avaliação é encolhida pelo prazo mais apertado que a inclui, e só por
+ele. Usar só o próprio prazo deixaria o plano inviável (duas provas no mesmo
+dia caberiam cada uma sozinha, mas não as duas); usar o prazo mais distante
+para todas faria a prova de daqui a quinze dias pagar pelo aperto da de
+daqui a dois, sem motivo — ela tem os treze dias seguintes. Com o mínimo dos
+prazos à frente, todo prefixo cabe por construção:
+`Σᵢ≤ₖ fᵢ·demandaᵢ ≤ gₖ·demandaPrefixo(dₖ) = cap(dₖ)`.
+
+### O piso por sessão separa "apertado" de "impossível"
+
+`MINIMO_POR_SESSAO = 10`: sessão de três minutos não é estudo, é ruído no
+calendário. Conteúdo cujo esforço cheio já é menor que o piso não é inflado —
+o piso dele é o próprio esforço.
+
+Daí os dois avisos:
+
+- comprimiu e coube → `COMPRESSED_PLAN`, com `compressionPercent`, que a tela
+  mostra em tom de informação (o cronograma está de pé, só mais lento);
+- nem no piso coube → `INSUFFICIENT_TIME`, com o déficit em minutos.
+
+Esta é a diferença que a `v1` não fazia: lá, qualquer aperto virava
+`INSUFFICIENT_TIME`, e o alerta aparecia tanto quando dava para ajustar
+quanto quando não dava.
+
+### O dia é rateado por ritmo exigido, com reserva para quem vence antes
+
+Dia a dia, cada avaliação ainda elegível tem uma `taxa = demanda restante /
+dias elegíveis até o prazo` — o ritmo que ela exige. A capacidade do dia é
+rateada proporcional a essa taxa, com dois ajustes:
+
+- **reserva**: a avaliação de prazo mais próximo leva no mínimo
+  `FATIA_DO_MAIS_URGENTE = 0,6` do dia enquanto tiver demanda. É o "o foco
+  ainda são os conteúdos da prova de sexta"; sem ela, uma prova distante com
+  500 minutos de conteúdo teria o maior ritmo exigido e tomaria o dia da
+  prova de depois de amanhã;
+- **teto de ritmo**: nenhuma cota passa da própria taxa. Sem o teto, uma
+  avaliação sozinha levaria o dia inteiro e o plano amontoaria tudo nos
+  primeiros dias, deixando vazios justamente os dias de véspera.
+
+Os 40% que sobram são o "ir estudando de leve" o conteúdo pesado da prova
+distante. Passada a prova mais próxima, ela deixa de dividir e a seguinte
+fica com o dia inteiro.
+
+### A folga do dia só vai para o dia que ficaria vazio
+
+Depois do rateio pode sobrar tempo que nenhuma cota consegue usar (a passada
+seguinte é maior que a cota). Essa sobra é oferecida **só a um dia que ficaria
+sem nenhuma sessão**, e no máximo uma passada por avaliação, na ordem de
+prazo. Oferecer a sobra de todo dia desfaria a distribuição que a cota
+acabou de montar; e deixar a mais urgente levar quanto coubesse faria ela
+tomar o dia inteiro, com a prova distante só começando depois do prazo da
+primeira.
+
+### O que esta versão ainda não faz
+
+A passada continua indivisível: um conteúdo é agendado inteiro num dia, nunca
+partido em dois (seção 13, pelo mesmo motivo de sempre — o progresso é
+registrado contra o conteúdo). A compressão garante que o **total** agendado
+cabe na janela até o prazo, não que cada dia caiba em si mesmo: uma sessão
+comprimida que ficou maior do que um dia sozinho ocupa o dia mais vazio
+estourando a capacidade dele, porque conteúdo apertado é melhor do que
+conteúdo que some do calendário. É o caso que
+`tests/integration/crud.int.test.ts` fixa: três conteúdos em dois dias de 30
+minutos dão 17 num dia e 43 no outro, com o total nos 60 disponíveis.
+
+## 17. Por onde estudar, e o dia que passou em silêncio
+
+O plano já dizia quando estudar e por quanto tempo. Faltavam as duas coisas
+que a pessoa pediu depois: material para abrir na hora da sessão, e uma
+regra justa para o dia que terminou sem ninguém confirmar nada.
+
+### O acervo é por conteúdo; a fatia é por passada
+
+Os links não são buscados por sessão, e sim por conteúdo: `StudyResource`
+guarda até 24 resultados ligados ao `StudyContent`, com `rank` na ordem em
+que a busca os devolveu. A sessão não escolhe o que buscar, ela escolhe
+**qual pedaço do acervo mostrar**: `fatiarPorPassada(acervo, passIndex)`
+devolve três links por passada, em janela deslizante com volta.
+
+É daí que sai a diversificação que ela pediu. O mesmo conteúdo estudado hoje,
+amanhã e depois tem `passIndex` 0, 1 e 2, logo abre as posições 0 a 2, 3 a 5
+e 6 a 8 do acervo: nenhum vídeo repetido entre os dias. Se o acervo vier
+curto, a janela dá a volta em vez de devolver tela vazia, porque repetir é
+melhor do que não ter nada para abrir.
+
+O `rank` existe porque sem ele a ordem do acervo seria `createdAt`, e as
+linhas do acervo entram na mesma transação com o mesmo instante. O `passIndex` passou a
+ser gravado em `StudyActivity` pelo mesmo motivo: o distribuidor sempre soube
+de qual passada a sessão era, só jogava a informação fora.
+
+### A busca é gravada, não refeita
+
+A primeira sessão que abre um conteúdo sem acervo dispara a busca, ordena o
+resultado e grava. Da segunda em diante nada sai para a internet. Três razões,
+na ordem: a diversificação só é estável se o acervo for o mesmo entre os dias;
+a tela abre no tempo do banco, não no tempo de uma API externa; e a cota
+gratuita da chave acabaria num dia de uso normal se cada toque buscasse.
+
+A `YOUTUBE_API_KEY` é opcional. Sem ela a API responde
+`suggestionsUnavailable: true` e a tela explica que as sugestões dependem da
+configuração, em vez de quebrar. Em teste os provedores ficam desligados por
+duas chaves diferentes (`env.temBuscaDeMaterial` e o `configurado` de cada
+provedor), porque suíte que sai para a rede não é suíte.
+
+### Por que só o YouTube busca
+
+O plano previa um segundo provedor, o Google Programmable Search, para trazer
+artigo e lista de exercício em texto. Ele foi escrito e descartado: a Custom
+Search JSON API está fechada para clientes novos e tem descontinuação marcada
+para 1º de janeiro de 2027. Projeto criado hoje recebe
+`403 This project does not have the access to Custom Search JSON API` mesmo
+com a API ativada, chave no projeto certo e mecanismo de pesquisa criado —
+não é configuração, é recusa de cadastro.
+
+O que restou cobre as duas intenções com um provedor só: o `YouTubeSearchProvider`
+faz duas chamadas por conteúdo, uma atrás de aula e outra atrás de exercício
+resolvido, e marca a segunda como `EXERCISE_LIST`. Vídeo de resolução não é
+lista de exercício impressa, mas é material de praticar, que era o ponto.
+
+A interface `ResourceSearchProvider` continua existindo por isso mesmo: trocar
+ou somar provedor (Brave, Tavily, Wikipédia) é escrever um arquivo em
+`providers/` e acrescentá-lo à lista do serviço. Nada mais no app conhece o
+YouTube.
+
+A busca mora em `providers/`, pasta nova, e não em `domain/`: o domínio é
+puro e continua sendo. O ranking e o fatiamento, que são a parte interessante,
+ficaram em `domain/resources/`, sem rede, e é lá que a promessa de não repetir
+link está provada em teste.
+
+### Dia que passou sem marcação é dia estudado
+
+Antes, só `StudyProgress` com status `DONE` contava como passada feita. O
+efeito era perverso: quem não abriu o app no fim do dia via o cronograma
+inteiro reapertar sozinho no dia seguinte, como se não tivesse estudado nada.
+A regra agora é a oposta. `contarPassadasPresumidas` lê as atividades do plano
+com data anterior a hoje e conta como feita toda passada cujo status não é
+`SKIPPED`.
+
+O ponto fino é que a presunção é uma **leitura do plano**, não um fato
+gravado. `StudyProgress` continua tendo só o que a pessoa afirmou: inventar um
+`DONE` que ela não marcou mentiria no histórico e nos minutos estudados, que
+alimentam o dashboard e a sequência. E a leitura se mantém entre recálculos
+porque `selecionarCopias` carrega o status que a atividade tinha.
+
+Quem quer reapertar o cronograma diz que não estudou. A sessão vira `SKIPPED`,
+para de contar, e o recálculo redistribui aquele conteúdo nos dias que restam
+até o prazo. Calendário, bolinhas, cards e avisos atualizam sozinhos, porque
+todos já leem do plano ativo.
+
+A marcação vale para qualquer dia anterior a hoje e nunca para o futuro
+(`input.date > hoje` continua sendo `400`): confirmar um dia que ainda não
+aconteceu não é um registro, é um palpite. A tela do dia abre com tudo
+marcado como estudado e a pessoa desmarca o que falhou, que é a mesma regra
+do servidor, visível.
+
+---
+
+## 18. O cronômetro fecha a sessão do plano
+
+O Timer media tempo e o plano marcava sessão, e nada ligava os dois: quem
+cronometrava duas horas de Eletrônica ainda precisava abrir o calendário e
+confirmar a sessão de Eletrônica à mão, dizendo a mesma coisa duas vezes.
+
+### A entrada de tempo aponta para a sessão
+
+`StudyTimeEntry` ganhou `activityId` opcional, com `onDelete: SetNull`:
+apagar a avaliação (e com ela as sessões) não pode apagar o tempo que a
+pessoa de fato estudou. O `subjectId` continua vindo do conteúdo da sessão, e
+não do que o app mandou — o servidor não confia no cliente para dizer de que
+matéria era o estudo que ele mesmo pode conferir.
+
+A sessão creditada é carregada por `findForTimeCreditForUser`, que já filtra
+pelo dono através do plano, e sessão com data futura é recusada pela mesma
+razão que a confirmação do dia recusa: registrar estudo que ainda não
+aconteceu não é registro, é palpite.
+
+### Abaixo do previsto a sessão fica `IN_PROGRESS`, não `PLANNED`
+
+O plano original dizia que, abaixo dos minutos estimados, nada seria gravado e
+o tempo ficaria só acumulado. Na implementação isso virou `IN_PROGRESS` com
+`minutesSpent` igual ao total já cronometrado, porque os três estados já
+existem e a agenda já desenha `IN_PROGRESS` de forma diferente (12.6). Deixar
+a sessão `PLANNED` depois de quarenta minutos de cronômetro faria a tela
+mentir sobre o que a pessoa fez. Quando a soma alcança `estimatedMinutes`, o
+mesmo progresso vira `DONE` e a atividade também.
+
+Fechar uma sessão **não** dispara recálculo, pela mesma razão que o
+`ActivityConfirmationService` só recalcula quando há sessão pulada: estudar o
+que estava planejado não libera capacidade nenhuma, então não há o que
+redistribuir.
+
+### Por que a meta do dia passou a ignorar parte do cronômetro
+
+`DashboardService` somava minutos do progresso **mais** segundos do
+cronômetro. Com o crédito, o mesmo estudo passou a existir dos dois lados, e a
+meta do dia contaria em dobro: uma hora cronometrada numa sessão de uma hora
+marcaria duas horas.
+
+A correção fica no model: `sumSecondsInRange` filtra `activityId: null`, ou
+seja, só soma o cronômetro **avulso**. O tempo creditado já chega pelo
+progresso, com o mesmo valor. A sequência (`resolveStreak`) não mudou: ali os
+registros só respondem "houve estudo neste dia", e contar duas vezes o mesmo
+dia não altera a resposta.
+
+---
+
+## 19. O plano da IA precisa de data para virar calendário
+
+O Gemini devolvia uma grade semanal (dia da semana + sessões) e ela morria
+como recomendação na aba Matérias. O motor do app é `deadline-first`: ele
+agenda o que está preso a uma avaliação com data. Grade semanal sem prazo não
+tem como entrar nele — não é limitação de código, é o que o algoritmo
+significa.
+
+### Devolver o que já estava sendo lido
+
+O prompt já mandava o modelo identificar "datas de aulas, provas, trabalhos e
+entregas" no material, e depois jogava isso fora. `AiStudyPlan` ganhou
+`assessments`, com matéria, título, data e tipo, e a instrução ficou
+explícita: devolver só data que esteja no material, nunca inventar. O schema
+descarta avaliação inválida — e também data no passado — sem derrubar o plano
+inteiro, na mesma linha tolerante do resto da validação.
+
+Quando a IA não acha data nenhuma, quem pergunta é o app, uma data por
+matéria, antes de aplicar. Quem prefere não informar continua tendo as
+matérias cadastradas, e a resposta diz em uma linha por que o calendário não
+se moveu, em vez de deixar a pessoa procurando sessões que nunca seriam
+criadas.
+
+### Aplicar é um serviço, não um monte de chamadas da tela
+
+`POST /ai/study-plan/apply` cria as matérias que faltam, as avaliações, os
+conteúdos vindos dos `topics` e então recalcula. Três decisões aqui:
+
+- **Idempotência por nome normalizado.** `normalizeSubjectName` (que ignora
+  acento e caixa) subiu do app para o `packages/shared`, junto com a paleta de
+  cores, justamente porque agora os dois lados precisam decidir igual se
+  "Cálculo II" e "calculo ii" são a mesma matéria. Avaliação com mesmo título
+  e mesma data também não duplica.
+- **Os tópicos vão para a avaliação mais próxima daquela matéria.** Espalhar o
+  mesmo conteúdo por todas as provas da matéria multiplicaria o estudo; ligar
+  à mais distante adiaria tudo. A mais próxima é a que o `deadline-first` vai
+  apertar primeiro, que é o comportamento que a pessoa espera ao aplicar um
+  plano.
+- **Um `recalculate` só, no fim e fora da transação.** Recalcular a cada
+  matéria criada refaria o cronograma inteiro N vezes para chegar ao mesmo
+  lugar, e o recálculo tem transação própria.
+
+### A disponibilidade é oferecida, nunca sobrescrita
+
+Se a semana estiver toda zerada, a tela oferece preencher com os minutos por
+dia que a IA sugeriu. Oferece: sobrescrever uma disponibilidade cadastrada à
+mão seria apagar uma decisão de quem estuda, e é justamente o dado que o
+planejador trata como verdade.
