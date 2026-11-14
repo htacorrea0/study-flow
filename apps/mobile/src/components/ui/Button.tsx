@@ -1,15 +1,19 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
+import type { ComponentType } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 
-import { colors, radii, sizes, typography } from '@/theme';
+import type { IconProps } from "@/components/icons/createIcon";
+import { colors, radii, sizes, typography } from "@/theme";
 
 type ButtonProps = {
-  label: string;
+  label?: string;
   onPress: () => void;
+  icon?: ComponentType<IconProps>;
+  accessibilityLabel?: string;
   /**
    * `primary`: fundo índigo. `secondary`: fundo branco com borda.
    * `danger`: fundo vermelho, para a ação que destrói dado.
    */
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: "primary" | "secondary" | "danger";
   loading?: boolean;
   disabled?: boolean;
 };
@@ -29,35 +33,56 @@ type ButtonProps = {
 export function Button({
   label,
   onPress,
-  variant = 'primary',
+  variant = "primary",
   loading = false,
   disabled = false,
+  icon: Icon,
+  accessibilityLabel,
 }: ButtonProps) {
-  const isSecondary = variant === 'secondary';
+  const isSecondary = variant === "secondary";
   const isBlocked = disabled || loading;
+  const isIconOnly = Icon !== undefined && label === undefined;
 
   return (
     <Pressable
       onPress={onPress}
       disabled={isBlocked}
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: isBlocked, busy: loading }}
       style={({ pressed }) => [
         styles.base,
         isSecondary ? styles.secondary : styles.preenchido,
-        variant === 'danger' ? styles.danger : null,
-        variant === 'primary' ? styles.primary : null,
+        isIconOnly ? styles.iconOnly : null,
+        variant === "danger" ? styles.danger : null,
+        variant === "primary" ? styles.primary : null,
         pressed && !isBlocked ? styles.pressed : null,
         isBlocked ? styles.blocked : null,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isSecondary ? colors.primary : colors.white} />
+        <ActivityIndicator
+          color={isSecondary ? colors.primary : colors.white}
+        />
       ) : (
-        <Text style={[styles.label, isSecondary ? styles.labelSecondary : styles.labelPrimary]}>
-          {label}
-        </Text>
+        <>
+          {Icon === undefined ? null : (
+            <Icon
+              color={isSecondary ? colors.primary : colors.white}
+              size={sizes.inputIcon}
+            />
+          )}
+          {label === undefined ? null : (
+            <Text
+              style={[
+                styles.label,
+                isSecondary ? styles.labelSecondary : styles.labelPrimary,
+              ]}
+            >
+              {label}
+            </Text>
+          )}
+        </>
       )}
     </Pressable>
   );
@@ -65,9 +90,14 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: radii.control,
+  },
+  iconOnly: {
+    aspectRatio: 1,
+    paddingHorizontal: 0,
+    width: sizes.controlHeight,
   },
   preenchido: {
     height: sizes.controlHeight,

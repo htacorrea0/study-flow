@@ -8,8 +8,7 @@ import type { Weekday } from './domain';
  * cada dia da semana. Dia com zero minuto não é dia de estudo e não recebe
  * sessão nenhuma.
  *
- * As exceções por data (`AvailabilityException`) são lidas pelo cálculo de
- * capacidade, mas não têm tela nesta etapa, então não aparecem aqui.
+ * As exceções substituem a disponibilidade habitual numa data específica.
  */
 
 /** Os minutos de um dia da semana. */
@@ -29,6 +28,13 @@ export interface AvailabilityDay {
  */
 export interface AvailabilityResponse {
   readonly days: readonly AvailabilityDay[];
+  readonly exceptions: readonly AvailabilityException[];
+}
+
+export interface AvailabilityException {
+  readonly date: string;
+  readonly minutes: number;
+  readonly reason: string | null;
 }
 
 /**
@@ -41,5 +47,10 @@ export interface AvailabilityResponse {
  */
 export interface AvailabilityMutationResponse {
   readonly availability: AvailabilityResponse;
+  readonly conflicts: readonly PlanConflict[];
+}
+
+export interface AvailabilityExceptionMutationResponse {
+  readonly exception: AvailabilityException;
   readonly conflicts: readonly PlanConflict[];
 }

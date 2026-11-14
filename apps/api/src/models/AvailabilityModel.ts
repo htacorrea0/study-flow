@@ -79,3 +79,30 @@ export async function findExceptionsInRange(
     where: { userId, date: { gte: first, lte: last } },
   });
 }
+
+export async function findExceptionsForUser(
+  userId: string,
+): Promise<readonly AvailabilityException[]> {
+  return prisma.availabilityException.findMany({
+    where: { userId },
+    orderBy: { date: 'asc' },
+  });
+}
+
+export async function upsertException(
+  userId: string,
+  date: Date,
+  minutes: number,
+  reason: string | null,
+): Promise<AvailabilityException> {
+  return prisma.availabilityException.upsert({
+    where: { userId_date: { userId, date } },
+    create: { userId, date, minutes, reason },
+    update: { minutes, reason },
+  });
+}
+
+export async function deleteException(userId: string, date: Date): Promise<boolean> {
+  const result = await prisma.availabilityException.deleteMany({ where: { userId, date } });
+  return result.count > 0;
+}

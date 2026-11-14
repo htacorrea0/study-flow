@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { WEEKDAYS } from '../types/domain';
-import { minutesSchema } from './common';
+import { isoDateSchema, minutesSchema } from './common';
 
 /**
  * Validação da disponibilidade semanal.
@@ -31,3 +31,11 @@ export const putAvailabilitySchema = z.object({
     }),
 });
 export type PutAvailabilityInput = z.infer<typeof putAvailabilitySchema>;
+
+export const availabilityExceptionSchema = z.object({
+  minutes: minutesSchema,
+  reason: z.string().trim().max(200, 'A justificativa deve ter no máximo 200 caracteres.').nullable().optional(),
+});
+
+export const availabilityExceptionDateSchema = z.object({ date: isoDateSchema });
+export type AvailabilityExceptionInput = z.infer<typeof availabilityExceptionSchema>;

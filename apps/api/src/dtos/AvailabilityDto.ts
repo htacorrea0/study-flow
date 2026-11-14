@@ -1,6 +1,11 @@
-import { WEEKDAYS, type AvailabilityDay, type AvailabilityResponse } from '@study-flow/shared';
+import {
+  WEEKDAYS,
+  type AvailabilityDay,
+  type AvailabilityException,
+  type AvailabilityResponse,
+} from '@study-flow/shared';
 
-import type { StudyAvailability } from '../generated/prisma/client';
+import type { AvailabilityException as PrismaAvailabilityException, StudyAvailability } from '../generated/prisma/client';
 
 /**
  * A semana inteira, sempre com os sete dias.
@@ -15,6 +20,7 @@ import type { StudyAvailability } from '../generated/prisma/client';
  */
 export function toAvailabilityResponse(
   registros: readonly StudyAvailability[],
+  excecoes: readonly PrismaAvailabilityException[] = [],
 ): AvailabilityResponse {
   const porDia = new Map(registros.map((registro) => [registro.weekday, registro.minutes]));
 
@@ -23,5 +29,18 @@ export function toAvailabilityResponse(
     minutes: porDia.get(weekday) ?? 0,
   }));
 
-  return { days };
+  return {
+    days,
+    exceptions: excecoes.map(toAvailabilityException),
+  };
+}
+
+export function toAvailabilityException(
+  exception: PrismaAvailabilityException,
+): AvailabilityException {
+  return {
+    date: exception.date.toISOString().slice(0, 10),
+    minutes: exception.minutes,
+    reason: exception.reason,
+  };
 }

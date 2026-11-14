@@ -4,7 +4,7 @@ import type { AvailabilityResponse } from '@study-flow/shared';
 import { UnauthorizedError } from '../../errors/HttpErrors';
 import * as AvailabilityService from '../../services/AvailabilityService';
 
-/** GET /availability — sempre os sete dias, zerados quando nunca foram preenchidos. */
+/** GET /availability — semana completa e exceções ordenadas por data. */
 export const GetAvailabilityController: RequestHandler = async (req, res) => {
   if (!req.user) {
     throw new UnauthorizedError('Autenticação necessária.');

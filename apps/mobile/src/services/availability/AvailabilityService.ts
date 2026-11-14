@@ -1,4 +1,6 @@
 import type {
+  AvailabilityExceptionInput,
+  AvailabilityExceptionMutationResponse,
   AvailabilityMutationResponse,
   AvailabilityResponse,
   PutAvailabilityInput,
@@ -17,5 +19,25 @@ export async function putAvailability(
   input: PutAvailabilityInput,
 ): Promise<AvailabilityMutationResponse> {
   const { data } = await apiClient.put<AvailabilityMutationResponse>('/availability', input);
+  return data;
+}
+
+export async function putAvailabilityException(
+  date: string,
+  input: AvailabilityExceptionInput,
+): Promise<AvailabilityExceptionMutationResponse> {
+  const { data } = await apiClient.put<AvailabilityExceptionMutationResponse>(
+    `/availability/exceptions/${date}`,
+    input,
+  );
+  return data;
+}
+
+export async function deleteAvailabilityException(
+  date: string,
+): Promise<{ conflicts: readonly import('@study-flow/shared').PlanConflict[] }> {
+  const { data } = await apiClient.delete<{ conflicts: readonly import('@study-flow/shared').PlanConflict[] }>(
+    `/availability/exceptions/${date}`,
+  );
   return data;
 }
