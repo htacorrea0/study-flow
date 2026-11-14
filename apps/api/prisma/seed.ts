@@ -367,7 +367,7 @@ async function main(): Promise<void> {
   const conteudos = await criarMaterias(user.id, hoje);
   await gravarHistorico(user.id, hoje, conteudos);
 
-  const resultado = await planService.recalculate(user.id, { kind: 'all' }, agora);
+  const resultado = await planService.recalculate(user.id, agora);
 
   const plano = await prisma.studyPlan.findFirst({
     where: { userId: user.id, status: 'ACTIVE' },

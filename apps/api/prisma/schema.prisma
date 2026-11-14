@@ -103,7 +103,6 @@ model User {
   studyPlans             StudyPlan[]
   progressRecords        StudyProgress[]
   studyTimeEntries       StudyTimeEntry[]
-  notificationPreference NotificationPreference?
   aiStudyPlan            AiStudyPlanSnapshot?
 
   @@map("users")
@@ -111,8 +110,8 @@ model User {
 
 /// Matéria acadêmica cadastrada pela pessoa usuária (ex.: Eletrônica Analógica).
 model Subject {
-  id     String @id @default(uuid()) @db.Uuid
-  userId String @db.Uuid
+  id     String  @id @default(uuid()) @db.Uuid
+  userId String  @db.Uuid
   name   String
   /// Cor hexadecimal opcional, para distinguir as matérias no calendário.
   color  String?
@@ -120,8 +119,8 @@ model Subject {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assessments Assessment[]
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assessments      Assessment[]
   studyTimeEntries StudyTimeEntry[]
 
   @@unique([userId, name])
@@ -134,17 +133,17 @@ model Subject {
 /// diferentes: nada no modelo impede isso, e o algoritmo precisa considerar
 /// todas as avaliações do horizonte ao mesmo tempo.
 model Assessment {
-  id         String         @id @default(uuid()) @db.Uuid
-  userId     String         @db.Uuid
-  subjectId  String         @db.Uuid
-  type       AssessmentType
-  title      String
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid
+  subjectId String         @db.Uuid
+  type      AssessmentType
+  title     String
   /// Momento da prova ou prazo de entrega do trabalho.
-  dueAt      DateTime
+  dueAt     DateTime
   /// false quando a pessoa informou só a data; nesse caso o horário de dueAt
   /// é irrelevante e a interface deve exibir apenas o dia.
-  hasTime    Boolean        @default(false)
-  notes      String?
+  hasTime   Boolean        @default(false)
+  notes     String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -258,6 +257,10 @@ model StudyPlan {
 
   generatedAt DateTime @default(now())
 
+  /// Avisos do distribuidor para esta versão do plano, no formato PlanConflict.
+  /// Vivem aqui porque nascem e morrem com a versão: recalcular cria linha nova.
+  conflicts Json @default("[]")
+
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   activities StudyActivity[]
 
@@ -282,6 +285,11 @@ model StudyActivity {
   position         Int
   status           ActivityStatus @default(PLANNED)
 
+  /// Qual passada do conteúdo esta sessão é: 0 é a primeira leitura, 1 a
+  /// primeira revisão, e assim por diante. É o que permite sugerir material
+  /// diferente a cada dia em que o mesmo conteúdo volta ao calendário.
+  passIndex Int @default(0)
+
   /// true quando a pessoa editou a atividade à mão. O recálculo deve respeitar
   /// essas edições em vez de descartá-las silenciosamente.
   manuallyEdited Boolean @default(false)
@@ -289,11 +297,12 @@ model StudyActivity {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  plan            StudyPlan       @relation(fields: [planId], references: [id], onDelete: Cascade)
+  plan            StudyPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
   /// A avaliação é alcançada por content.assessment. Não há assessmentId aqui
   /// de propósito: seria um dado derivado, sujeito a divergir do conteúdo.
-  content         StudyContent    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  content         StudyContent     @relation(fields: [contentId], references: [id], onDelete: Cascade)
   progressRecords StudyProgress[]
+  timeEntries     StudyTimeEntry[]
 
   @@index([planId, scheduledDate])
   @@index([contentId])
@@ -334,18 +343,27 @@ model StudyProgress {
 /// Guarda blocos de segundos para compor o total diário sem depender de
 /// confirmação de sessão do calendário.
 model StudyTimeEntry {
-  id        String          @id @default(uuid()) @db.Uuid
-  userId    String          @db.Uuid
-  subjectId String?         @db.Uuid
-  source    StudyTimeSource
-  seconds   Int
-  recordedAt DateTime       @default(now())
+  id         String          @id @default(uuid()) @db.Uuid
+  userId     String          @db.Uuid
+  subjectId  String?         @db.Uuid
+  /// Sessão do plano que este bloco de tempo credita. Nulo quando a pessoa
+  /// cronometrou solta, só pela matéria ou sem matéria nenhuma. O dashboard
+  /// usa esta coluna para não contar duas vezes: bloco creditado a uma sessão
+  /// chega à meta do dia pelo StudyProgress, não por aqui.
+  activityId String?         @db.Uuid
+  source     StudyTimeSource
+  seconds    Int
+  recordedAt DateTime        @default(now())
 
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject  Subject?       @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  /// SetNull e não Cascade: o replanejamento aposenta atividades, e o tempo
+  /// que a pessoa de fato estudou não pode desaparecer junto.
+  activity StudyActivity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
 
   @@index([userId, recordedAt])
   @@index([subjectId])
+  @@index([activityId])
   @@map("study_time_entries")
 }
 
@@ -360,6 +378,10 @@ model StudyResource {
   description String?
   type        ResourceType
   url         String
+  /// Posição no acervo do conteúdo, na ordem em que a busca devolveu. A
+  /// sugestão de cada passada é uma fatia desta ordem, então ela precisa ser
+  /// estável: `createdAt` empata quando o acervo inteiro é gravado de uma vez.
+  rank        Int          @default(0)
   /// Origem da sugestão (ex.: "youtube", "manual"), útil para auditar de onde
   /// veio o material quando houver integração com busca externa.
   source      String?
@@ -371,27 +393,6 @@ model StudyResource {
   @@unique([contentId, url])
   @@index([contentId])
   @@map("study_resources")
-}
-
-/// Preferências de lembrete. Um registro por pessoa.
-model NotificationPreference {
-  id     String @id @default(uuid()) @db.Uuid
-  userId String @unique @db.Uuid
-
-  studyReminderEnabled     Boolean @default(true)
-  /// Horário do lembrete diário, no formato HH:mm e no timezone do usuário.
-  reminderTime             String  @default("19:00")
-  pendingActivitiesEnabled Boolean @default(true)
-  /// Quantos dias antes de uma avaliação avisar.
-  assessmentReminderDays   Int     @default(3)
-  planUpdatedEnabled       Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("notification_preferences")
 }
 
 /// Último plano de estudos sugerido pelo assistente (Gemini) e aplicado pela
