@@ -695,6 +695,10 @@ Nomes de arquivo e organização de pastas:
 - Telas de **matérias**, **avaliação com conteúdos** e **disponibilidade**,
   mais o painel "O que você estudou?" dentro da agenda do dia, com o
   "Marcar todas" de três estados.
+- **Exceções de disponibilidade** (`PUT/DELETE /availability/exceptions/:date`):
+  uma data específica substitui os minutos habituais daquele dia, refaz o
+  planejamento e exibe avisos de conflito. A tela permite cadastrar,
+  justificar e remover exceções.
 - **Profundidade de estudo** por conteúdo (básico, intermediário ou intenso):
   decide em quantos dias diferentes aquele assunto é agendado, de uma a três
   passadas, com a revisão custando metade do esforço da primeira passada. É
@@ -728,9 +732,6 @@ Nomes de arquivo e organização de pastas:
 **Interface**
 - Cronômetro Pomodoro, tela de progresso e tela de perfil. Timer e Progresso
   abrem uma tela em branco.
-- Tela para **exceções de disponibilidade** ("nesta terça só tenho 30
-  minutos"). O cálculo de capacidade já lê a tabela `AvailabilityException`;
-  o seed cria uma; nenhuma tela cria.
 - Arrastar uma atividade para outro dia. A redistribuição é automática; não
   há edição manual da grade.
 - Recuperação de senha, onboarding e login com Google ou Apple.

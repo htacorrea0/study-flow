@@ -1,12 +1,21 @@
-import { WEEKDAYS, type AvailabilityDay, type PlanConflict, type Weekday } from '@study-flow/shared';
+import {
+  WEEKDAYS,
+  type AvailabilityDay,
+  type AvailabilityException,
+  type PlanConflict,
+  type Weekday,
+} from '@study-flow/shared';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
 import { ApiError } from '@/services/api';
 import {
+  deleteAvailabilityException,
   fetchAvailability,
+  putAvailabilityException,
   putAvailability,
 } from '@/services/availability/AvailabilityService';
+import { brDateToIso } from '@/utils/date';
 
 const MINUTOS_MAX = 1440;
 
@@ -26,6 +35,17 @@ export type AvailabilityController = {
   readonly errorMessage: string | null;
   readonly saving: boolean;
   readonly saved: boolean;
+  readonly exceptions: readonly AvailabilityException[];
+  readonly exceptionDate: string;
+  readonly exceptionMinutes: string;
+  readonly exceptionReason: string;
+  readonly exceptionSaving: boolean;
+  readonly setExceptionDate: (value: string) => void;
+  readonly setExceptionMinutes: (value: string) => void;
+  readonly setExceptionReason: (value: string) => void;
+  readonly saveException: () => void;
+  readonly removeException: (date: string) => void;
+  readonly goToExceptions: () => void;
   readonly setMinutes: (weekday: Weekday, value: string) => void;
   readonly save: () => void;
   readonly reload: () => void;
@@ -66,6 +86,11 @@ export function useAvailabilityController(): AvailabilityController {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [exceptions, setExceptions] = useState<readonly AvailabilityException[]>([]);
+  const [exceptionDate, setExceptionDate] = useState('');
+  const [exceptionMinutes, setExceptionMinutes] = useState('');
+  const [exceptionReason, setExceptionReason] = useState('');
+  const [exceptionSaving, setExceptionSaving] = useState(false);
 
   const load = useCallback(async (): Promise<void> => {
     setStatus('loading');
@@ -73,6 +98,7 @@ export function useAvailabilityController(): AvailabilityController {
     try {
       const resposta = await fetchAvailability();
       setRows(montarLinhas(resposta.days));
+      setExceptions(resposta.exceptions);
       setErrorMessage(null);
       setStatus('ready');
     } catch (error) {
@@ -109,6 +135,58 @@ export function useAvailabilityController(): AvailabilityController {
     }
   }
 
+  async function salvarExcecao(): Promise<void> {
+    const date = brDateToIso(exceptionDate);
+    const minutes = minutosDe(exceptionMinutes);
+
+    if (date === null) {
+      setErrorMessage('Informe uma data válida no formato DD/MM/AAAA.');
+      return;
+    }
+    if (!Number.isInteger(minutes) || minutes > MINUTOS_MAX) {
+      setErrorMessage(`Informe de 0 a ${MINUTOS_MAX} minutos na exceção.`);
+      return;
+    }
+
+    setExceptionSaving(true);
+    setErrorMessage(null);
+    try {
+      const resposta = await putAvailabilityException(date, {
+        minutes,
+        reason: exceptionReason.trim() || null,
+      });
+      setExceptions((atuais) =>
+        [...atuais.filter((item) => item.date !== date), resposta.exception].sort((a, b) =>
+          a.date.localeCompare(b.date),
+        ),
+      );
+      setConflicts(resposta.conflicts);
+      setExceptionDate('');
+      setExceptionMinutes('');
+      setExceptionReason('');
+      setSaved(true);
+    } catch (error) {
+      setErrorMessage(mensagemDe(error, 'Não foi possível salvar a exceção.'));
+    } finally {
+      setExceptionSaving(false);
+    }
+  }
+
+  async function removerExcecao(date: string): Promise<void> {
+    setExceptionSaving(true);
+    setErrorMessage(null);
+    try {
+      const resposta = await deleteAvailabilityException(date);
+      setExceptions((atuais) => atuais.filter((item) => item.date !== date));
+      setConflicts(resposta.conflicts);
+      setSaved(true);
+    } catch (error) {
+      setErrorMessage(mensagemDe(error, 'Não foi possível remover a exceção.'));
+    } finally {
+      setExceptionSaving(false);
+    }
+  }
+
   return {
     status,
     rows,
@@ -117,6 +195,30 @@ export function useAvailabilityController(): AvailabilityController {
     errorMessage,
     saving,
     saved,
+    exceptions,
+    exceptionDate,
+    exceptionMinutes,
+    exceptionReason,
+    exceptionSaving,
+    setExceptionDate: (value) => {
+      setSaved(false);
+      setExceptionDate(value);
+    },
+    setExceptionMinutes: (value) => {
+      setSaved(false);
+      setExceptionMinutes(value.replace(/\D/g, '').slice(0, 4));
+    },
+    setExceptionReason: (value) => {
+      setSaved(false);
+      setExceptionReason(value);
+    },
+    saveException: () => {
+      if (!exceptionSaving) void salvarExcecao();
+    },
+    removeException: (date) => {
+      if (!exceptionSaving) void removerExcecao(date);
+    },
+    goToExceptions: () => router.push('/materias/disponibilidade/excecoes'),
     setMinutes: (weekday, value) => {
       setSaved(false);
       setRows((atuais) =>

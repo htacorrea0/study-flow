@@ -1,22 +1,28 @@
-import type { Weekday } from '@study-flow/shared';
-import { StyleSheet, Text, View } from 'react-native';
+import type { Weekday } from "@study-flow/shared";
+import { StyleSheet, Text, View } from "react-native";
 
-import { ClockIcon } from '@/components/icons';
-import { Banner, Button, ScreenContainer, TextField } from '@/components/ui';
-import { useAvailabilityController } from '@/controllers/availability/AvailabilityController';
-import { colors, spacing, typography } from '@/theme';
-import { ErrorState } from '@/views/_templates/_errorState';
-import { ScreenTopBar } from '@/views/_templates/_screenTopBar';
-import { SkeletonBlock } from '@/views/_templates/_skeletonBlock';
+import { CalendarIcon, ClockIcon } from "@/components/icons";
+import {
+  Banner,
+  Button,
+  ListRow,
+  ScreenContainer,
+  TextField,
+} from "@/components/ui";
+import { useAvailabilityController } from "@/controllers/availability/AvailabilityController";
+import { colors, spacing, typography } from "@/theme";
+import { ErrorState } from "@/views/_templates/_errorState";
+import { ScreenTopBar } from "@/views/_templates/_screenTopBar";
+import { SkeletonBlock } from "@/views/_templates/_skeletonBlock";
 
 const NOME_DO_DIA: Record<Weekday, string> = {
-  MONDAY: 'Segunda-feira',
-  TUESDAY: 'Terça-feira',
-  WEDNESDAY: 'Quarta-feira',
-  THURSDAY: 'Quinta-feira',
-  FRIDAY: 'Sexta-feira',
-  SATURDAY: 'Sábado',
-  SUNDAY: 'Domingo',
+  MONDAY: "Segunda-feira",
+  TUESDAY: "Terça-feira",
+  WEDNESDAY: "Quarta-feira",
+  THURSDAY: "Quinta-feira",
+  FRIDAY: "Sexta-feira",
+  SATURDAY: "Sábado",
+  SUNDAY: "Domingo",
 };
 
 function totalLegivel(minutes: number): string {
@@ -27,7 +33,9 @@ function totalLegivel(minutes: number): string {
     return `${resto} min por semana`;
   }
 
-  return resto === 0 ? `${horas} h por semana` : `${horas} h ${resto} min por semana`;
+  return resto === 0
+    ? `${horas} h por semana`
+    : `${horas} h ${resto} min por semana`;
 }
 
 /**
@@ -40,12 +48,15 @@ function totalLegivel(minutes: number): string {
 export default function Availability() {
   const controller = useAvailabilityController();
 
-  if (controller.status === 'error') {
+  if (controller.status === "error") {
     return (
       <ScreenContainer>
         <ScreenTopBar title="Disponibilidade" onBack={controller.goBack} />
         <ErrorState
-          message={controller.errorMessage ?? 'Não foi possível carregar a disponibilidade.'}
+          message={
+            controller.errorMessage ??
+            "Não foi possível carregar a disponibilidade."
+          }
           onRetry={controller.reload}
         />
       </ScreenContainer>
@@ -56,12 +67,12 @@ export default function Availability() {
     <ScreenContainer>
       <ScreenTopBar title="Disponibilidade" onBack={controller.goBack}>
         <Text style={styles.explicacao}>
-          Quantos minutos você consegue estudar em cada dia. Dia com zero fica de fora da
-          distribuição.
+          Quantos minutos você consegue estudar em cada dia. Dia com zero fica
+          de fora da distribuição.
         </Text>
       </ScreenTopBar>
 
-      {controller.status === 'loading' ? (
+      {controller.status === "loading" ? (
         <View style={styles.lista}>
           <SkeletonBlock height={52} />
           <SkeletonBlock height={52} />
@@ -76,23 +87,34 @@ export default function Availability() {
               icon={ClockIcon}
               placeholder="0"
               value={row.minutes}
-              onChangeText={(texto) => controller.setMinutes(row.weekday, texto)}
+              onChangeText={(texto) =>
+                controller.setMinutes(row.weekday, texto)
+              }
               keyboardType="number-pad"
               maxLength={4}
               editable={!controller.saving}
             />
           ))}
 
-          <Text style={styles.total}>{totalLegivel(controller.totalMinutes)}</Text>
+          <Text style={styles.total}>
+            {totalLegivel(controller.totalMinutes)}
+          </Text>
 
           {controller.errorMessage === null ? null : (
-            <Text style={styles.erro} accessibilityLiveRegion="polite" role="alert">
+            <Text
+              style={styles.erro}
+              accessibilityLiveRegion="polite"
+              role="alert"
+            >
               {controller.errorMessage}
             </Text>
           )}
 
           {controller.saved && controller.conflicts.length === 0 ? (
-            <Banner tone="info" message="Disponibilidade salva e calendário refeito." />
+            <Banner
+              tone="info"
+              message="Disponibilidade salva e calendário refeito."
+            />
           ) : null}
 
           {controller.conflicts.map((conflict) => (
@@ -102,6 +124,13 @@ export default function Availability() {
               message={conflict.message}
             />
           ))}
+
+          <ListRow
+            title="Exceções"
+            subtitle="Altere o tempo disponível em datas específicas"
+            icon={CalendarIcon}
+            onPress={controller.goToExceptions}
+          />
 
           <Button
             label="Salvar disponibilidade"
@@ -117,6 +146,7 @@ export default function Availability() {
 const styles = StyleSheet.create({
   explicacao: {
     ...typography.screenSubtitle,
+    marginBottom: spacing.md,
   },
   lista: {
     gap: spacing.lg,

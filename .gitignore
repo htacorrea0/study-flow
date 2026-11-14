@@ -12,6 +12,7 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+.github/modernize/rearchitecture/artifacts/
 
 # Prisma — client gerado
 apps/api/src/generated/

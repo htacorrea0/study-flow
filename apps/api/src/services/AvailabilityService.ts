@@ -1,11 +1,14 @@
 import type {
+  AvailabilityExceptionInput,
+  AvailabilityExceptionMutationResponse,
   AvailabilityMutationResponse,
   AvailabilityResponse,
+  PlanConflict,
   PutAvailabilityInput,
 } from '@study-flow/shared';
 
 import { prisma } from '../config/prisma';
-import { toAvailabilityResponse } from '../dtos/AvailabilityDto';
+import { toAvailabilityException, toAvailabilityResponse } from '../dtos/AvailabilityDto';
 import { toPlanConflicts } from '../dtos/PlanDto';
 import * as availabilityModel from '../models/AvailabilityModel';
 import * as planService from '../services/PlanService';
@@ -20,8 +23,37 @@ import * as planService from '../services/PlanService';
  */
 
 export async function get(userId: string): Promise<AvailabilityResponse> {
-  const registros = await availabilityModel.findAllForUser(userId);
-  return toAvailabilityResponse(registros);
+  const [registros, excecoes] = await Promise.all([
+    availabilityModel.findAllForUser(userId),
+    availabilityModel.findExceptionsForUser(userId),
+  ]);
+  return toAvailabilityResponse(registros, excecoes);
+}
+
+export async function upsertException(
+  userId: string,
+  date: string,
+  input: AvailabilityExceptionInput,
+  now: Date,
+): Promise<AvailabilityExceptionMutationResponse> {
+  const exception = await availabilityModel.upsertException(
+    userId,
+    new Date(`${date}T00:00:00.000Z`),
+    input.minutes,
+    input.reason ?? null,
+  );
+  const resultado = await planService.recalculate(userId, { kind: 'all' }, now);
+  return { exception: toAvailabilityException(exception), conflicts: toPlanConflicts(resultado) };
+}
+
+export async function removeException(
+  userId: string,
+  date: string,
+  now: Date,
+): Promise<readonly PlanConflict[]> {
+  await availabilityModel.deleteException(userId, new Date(`${date}T00:00:00.000Z`));
+  const resultado = await planService.recalculate(userId, { kind: 'all' }, now);
+  return toPlanConflicts(resultado);
 }
 
 export async function put(
