@@ -21,6 +21,15 @@ export async function sumMinutesSpentInRange(
   return resultado._sum.minutesSpent ?? 0;
 }
 
+export async function sumAllMinutesSpent(userId: string): Promise<number> {
+  const result = await prisma.studyProgress.aggregate({
+    where: { userId, status: 'DONE' },
+    _sum: { minutesSpent: true },
+  });
+
+  return result._sum.minutesSpent ?? 0;
+}
+
 /**
  * Momentos em que a pessoa concluiu algo a partir de `since`.
  *

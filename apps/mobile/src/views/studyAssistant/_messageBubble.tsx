@@ -2,7 +2,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { FileTextIcon, GeminiIcon } from '@/components/icons';
 import type { ChatItem } from '@/controllers/studyAssistant/StudyAssistantController';
-import { colors, fontFamilies, radii, spacing, typography } from '@/theme';
+import { colors, darkColors, fontFamilies, radii, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 import { RichText } from './_richText';
 
@@ -18,6 +19,8 @@ type MessageBubbleProps = {
  */
 export function MessageBubble({ item }: MessageBubbleProps) {
   const daPessoa = item.role === 'user';
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
 
   return (
     <View style={[styles.linha, daPessoa ? styles.linhaPessoa : styles.linhaModelo]}>
@@ -27,12 +30,17 @@ export function MessageBubble({ item }: MessageBubbleProps) {
         </View>
       )}
 
-      <View style={[styles.balao, daPessoa ? styles.balaoPessoa : styles.balaoModelo]}>
+      <View
+        style={[
+          styles.balao,
+          daPessoa ? styles.balaoPessoa : { backgroundColor: palette.surface, borderColor: palette.border },
+        ]}
+      >
         {item.attachmentName ? (
-          <View style={[styles.anexo, daPessoa ? styles.anexoPessoa : null]}>
-            <FileTextIcon size={16} color={daPessoa ? colors.white : colors.primary} />
+          <View style={[styles.anexo, { backgroundColor: daPessoa ? 'rgba(255, 255, 255, 0.18)' : palette.primaryGlow }]}>
+            <FileTextIcon size={16} color={daPessoa ? colors.white : (isDark ? palette.primaryDark : colors.primary)} />
             <Text
-              style={[styles.anexoNome, daPessoa ? styles.textoPessoa : null]}
+              style={[styles.anexoNome, { color: daPessoa ? colors.white : palette.ink }]}
               numberOfLines={1}
             >
               {item.attachmentName}
@@ -43,7 +51,10 @@ export function MessageBubble({ item }: MessageBubbleProps) {
         {item.text.length > 0 ? (
           <RichText
             text={item.text}
-            style={[styles.texto, daPessoa ? styles.textoPessoa : null]}
+            style={[
+              styles.texto,
+              { color: daPessoa ? colors.white : palette.ink },
+            ]}
           />
         ) : null}
       </View>

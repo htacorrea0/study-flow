@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, fontFamilies } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type AvatarProps = {
   /** Iniciais prontas, como o servidor devolve em `user.initials`. */
@@ -22,9 +23,15 @@ const LADO = 48;
  * que a regra de corte seja a mesma em qualquer tela que as mostre.
  */
 export function Avatar({ initials, name }: AvatarProps) {
+  const { isDark } = useTheme();
+
   return (
-    <View style={styles.circle} accessible accessibilityLabel={`Foto de perfil de ${name}`}>
-      <Text style={styles.initials}>{initials}</Text>
+    <View
+      style={[styles.circle, isDark && styles.circleEscuro]}
+      accessible
+      accessibilityLabel={`Foto de perfil de ${name}`}
+    >
+      <Text style={[styles.initials, isDark && styles.textoClaro]}>{initials}</Text>
     </View>
   );
 }
@@ -43,5 +50,11 @@ const styles = StyleSheet.create({
     fontFamily: fontFamilies.outfitBold,
     fontSize: 16,
     lineHeight: 24,
+  },
+  circleEscuro: {
+    backgroundColor: '#312e81',
+  },
+  textoClaro: {
+    color: '#e0e7ff',
   },
 });

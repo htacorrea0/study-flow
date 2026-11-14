@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 
 import { EyeIcon, EyeOffIcon, type IconProps } from '@/components/icons';
-import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export type TextFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextColor'> & {
   /** Texto acima do campo. Vira também o rótulo de acessibilidade. */
@@ -48,6 +49,8 @@ export const TextField = forwardRef<TextFieldRef, TextFieldProps>(function TextF
   { label, icon: Icon, error, hint, secureToggle = false, editable = true, ...inputProps },
   ref,
 ) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const [isFocused, setIsFocused] = useState(false);
   const [isSecureVisible, setIsSecureVisible] = useState(false);
   const fieldId = useId();
@@ -60,21 +63,27 @@ export const TextField = forwardRef<TextFieldRef, TextFieldProps>(function TextF
     ? colors.danger
     : isFocused
       ? colors.primary
-      : colors.border;
+      : palette.border;
 
   return (
     <View style={styles.group}>
-      <Text style={styles.label} nativeID={`${fieldId}-label`}>
+      <Text style={[styles.label, isDark && styles.textoClaro]} nativeID={`${fieldId}-label`}>
         {label}
       </Text>
 
-      <View style={[styles.field, { borderColor }, !editable && styles.fieldDisabled]}>
-        <Icon color={hasError ? colors.danger : colors.textMuted} />
+      <View
+        style={[
+          styles.field,
+          { backgroundColor: palette.surface, borderColor },
+          !editable && styles.fieldDisabled,
+        ]}
+      >
+        <Icon color={hasError ? colors.danger : palette.textMuted} />
 
         <TextInput
           ref={ref}
-          style={styles.input}
-          placeholderTextColor={colors.textSubtle}
+          style={[styles.input, isDark && styles.textoClaro]}
+          placeholderTextColor={palette.textSubtle}
           editable={editable}
           secureTextEntry={secureToggle && !isSecureVisible}
           accessibilityLabel={label}
@@ -104,7 +113,7 @@ export const TextField = forwardRef<TextFieldRef, TextFieldProps>(function TextF
             accessibilityRole="button"
             accessibilityLabel={isSecureVisible ? 'Ocultar senha' : 'Mostrar senha'}
           >
-            <ToggleIcon color={colors.textSubtle} />
+            <ToggleIcon color={palette.textSubtle} />
           </Pressable>
         ) : null}
       </View>
@@ -162,5 +171,8 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typography.caption,
+  },
+  textoClaro: {
+    color: '#f8fafc',
   },
 });

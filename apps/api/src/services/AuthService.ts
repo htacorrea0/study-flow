@@ -1,10 +1,23 @@
-import type { AuthResponse, PublicUser, SignInInput, SignUpInput } from '@study-flow/shared';
+import type {
+  AuthResponse,
+  ProfileResponse,
+  PublicUser,
+  SignInInput,
+  SignUpInput,
+  UpdateNotificationPreferencesInput,
+  UpdatePasswordInput,
+  UpdateProfileInput,
+} from '@study-flow/shared';
 
 import { toPublicUser } from '../dtos/UserDto';
 import { ConflictError, UnauthorizedError } from '../errors/HttpErrors';
 import * as userModel from '../models/UserModel';
+import * as notificationPreferenceModel from '../models/NotificationPreferenceModel';
+import * as studyProgressModel from '../models/StudyProgressModel';
+import * as studyTimeEntryModel from '../models/StudyTimeEntryModel';
 import { getDummyHash, hashPassword, verifyPassword } from '../security/password';
 import { signAccessToken } from '../security/token';
+import { getDashboard } from './DashboardService';
 
 /**
  * Regras de cadastro e login.
@@ -93,6 +106,72 @@ export async function getMe(userId: string): Promise<PublicUser> {
   }
 
   return toPublicUser(user);
+}
+
+export async function getProfile(userId: string): Promise<ProfileResponse> {
+  const user = await userModel.findById(userId);
+  if (user === null) throw new UnauthorizedError('Sessão inválida. Entre novamente.');
+
+  const [notifications, totalTimerSeconds, totalProgressMinutes, dashboard] = await Promise.all([
+    notificationPreferenceModel.findOrCreate(userId),
+    studyTimeEntryModel.sumAllSeconds(userId),
+    studyProgressModel.sumAllMinutesSpent(userId),
+    getDashboard(userId, new Date()),
+  ]);
+
+  return {
+    user: toPublicUser(user),
+    notifications: {
+      studyReminderEnabled: notifications.studyReminderEnabled,
+      reminderTime: notifications.reminderTime,
+    },
+    metrics: {
+      totalStudySeconds: totalTimerSeconds + totalProgressMinutes * 60,
+      streakDays: dashboard.streakDays,
+    },
+  };
+}
+
+export async function updateProfile(userId: string, input: UpdateProfileInput): Promise<PublicUser> {
+  if (input.email !== undefined) {
+    const existing = await userModel.findByEmail(input.email);
+    if (existing !== null && existing.id !== userId) {
+      throw new ConflictError('Já existe uma conta com este e-mail.');
+    }
+  }
+
+  let user;
+  try {
+    user = await userModel.update(userId, input);
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new ConflictError('Já existe uma conta com este e-mail.');
+    }
+    throw error;
+  }
+  if (user === null) throw new UnauthorizedError('Sessão inválida. Entre novamente.');
+  return toPublicUser(user);
+}
+
+export async function updatePassword(userId: string, input: UpdatePasswordInput): Promise<void> {
+  const user = await userModel.findById(userId);
+  if (user === null) throw new UnauthorizedError('Sessão inválida. Entre novamente.');
+
+  const valid = await verifyPassword(input.currentPassword, user.passwordHash);
+  if (!valid) throw new UnauthorizedError('A senha atual está incorreta.');
+
+  await userModel.updatePassword(userId, await hashPassword(input.newPassword));
+}
+
+export async function updateNotifications(
+  userId: string,
+  input: UpdateNotificationPreferencesInput,
+): Promise<ProfileResponse['notifications']> {
+  const preferences = await notificationPreferenceModel.update(userId, input);
+  return {
+    studyReminderEnabled: preferences.studyReminderEnabled,
+    reminderTime: preferences.reminderTime,
+  };
 }
 
 function buildSession(user: PublicUser): AuthResponse {

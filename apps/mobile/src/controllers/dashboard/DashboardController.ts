@@ -15,6 +15,7 @@ export type DashboardController = {
   readonly reload: () => void;
   readonly goToCalendar: () => void;
   readonly goToTimer: () => void;
+  readonly goToProfile: () => void;
 };
 
 /**
@@ -69,5 +70,6 @@ export function useDashboardController(): DashboardController {
     // empilhadas: o Figma desenha os dois dentro da mesma navegação.
     goToCalendar: () => router.navigate('/calendario'),
     goToTimer: () => router.navigate('/timer'),
+    goToProfile: () => router.push('/perfil'),
   };
 }

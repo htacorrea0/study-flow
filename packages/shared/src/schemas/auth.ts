@@ -179,3 +179,25 @@ export const signInSchema = z.object({
 
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
+
+export const updateProfileSchema = z
+  .object({
+    name: nameSchema.optional(),
+    email: emailSchema.optional(),
+  })
+  .refine((value) => value.name !== undefined || value.email !== undefined, {
+    message: 'Informe ao menos um dado para atualizar.',
+  });
+
+export const updatePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Informe a senha atual.').max(PASSWORD_MAX_LENGTH),
+  newPassword: passwordSchema,
+});
+
+export const updateNotificationPreferencesSchema = z.object({
+  studyReminderEnabled: z.boolean(),
+  reminderTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Informe um horário válido.')
+    .optional(),
+});

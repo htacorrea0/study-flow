@@ -4,7 +4,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PlusIcon } from '@/components/icons';
 import { ListRow, ScreenContainer } from '@/components/ui';
 import { useSubjectFormController } from '@/controllers/subjects/SubjectFormController';
-import { spacing, typography } from '@/theme';
+import { colors, darkColors, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { ErrorState } from '@/views/_templates/_errorState';
 import { ScreenTopBar } from '@/views/_templates/_screenTopBar';
 import { SkeletonBlock } from '@/views/_templates/_skeletonBlock';
@@ -33,6 +34,8 @@ function primeiroParametro(valor: string | string[] | undefined): string | undef
  * enquanto a matéria não tem id.
  */
 export default function Subject() {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = primeiroParametro(params.id);
   const controller = useSubjectFormController(id);
@@ -71,10 +74,10 @@ export default function Subject() {
 
       {controller.editing && controller.status === 'ready' ? (
         <View style={styles.bloco}>
-          <Text style={styles.titulo}>Provas e trabalhos</Text>
+          <Text style={[styles.titulo, { color: palette.ink }]}>Provas e trabalhos</Text>
 
           {controller.assessments.length === 0 ? (
-            <Text style={styles.vazio}>
+            <Text style={[styles.vazio, { color: palette.textMuted }]}>
               Nenhuma avaliação ainda. Marque a prova ou o trabalho para o app distribuir o
               estudo nos dias até lá.
             </Text>

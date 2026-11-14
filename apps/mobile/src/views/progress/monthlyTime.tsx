@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Card, ScreenContainer } from '@/components/ui';
 import { useMonthlyTimeController } from '@/controllers/progress/MonthlyTimeController';
-import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { formatStudyDuration } from '@/utils/duration';
 import { ErrorState } from '@/views/_templates/_errorState';
 import { ScreenTopBar } from '@/views/_templates/_screenTopBar';
@@ -61,6 +62,9 @@ type MonthlyContentProps = {
 };
 
 function MonthlyContent({ data, averageSecondsPerStudiedDay }: MonthlyContentProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   if (data.totalSeconds === 0) {
     return (
       <View style={styles.corpo}>
@@ -89,7 +93,7 @@ function MonthlyContent({ data, averageSecondsPerStudiedDay }: MonthlyContentPro
       </Card>
 
       <View style={styles.secao}>
-        <Text style={styles.secaoTitulo}>Por matéria</Text>
+        <Text style={[styles.secaoTitulo, { color: palette.ink }]}>Por matéria</Text>
 
         {data.subjects.map((subject) => (
           <BarRow
@@ -98,12 +102,13 @@ function MonthlyContent({ data, averageSecondsPerStudiedDay }: MonthlyContentPro
             value={formatStudyDuration(subject.seconds)}
             percent={(subject.seconds / maiorMateria) * 100}
             color={subject.color ?? colors.primary}
+            isDark={isDark}
           />
         ))}
       </View>
 
       <View style={styles.secao}>
-        <Text style={styles.secaoTitulo}>Por dia</Text>
+        <Text style={[styles.secaoTitulo, { color: palette.ink }]}>Por dia</Text>
 
         {[...data.days].reverse().map((day) => (
           <BarRow
@@ -112,6 +117,7 @@ function MonthlyContent({ data, averageSecondsPerStudiedDay }: MonthlyContentPro
             value={formatStudyDuration(day.seconds)}
             percent={(day.seconds / maiorDia) * 100}
             color={colors.primary}
+            isDark={isDark}
           />
         ))}
       </View>
@@ -124,19 +130,36 @@ type BarRowProps = {
   readonly value: string;
   readonly percent: number;
   readonly color: string;
+  readonly isDark: boolean;
 };
 
-function BarRow({ label, value, percent, color }: BarRowProps) {
+function BarRow({ label, value, percent, color, isDark }: BarRowProps) {
+  const palette = isDark ? darkColors : colors;
+
   return (
-    <View style={styles.linha} accessible accessibilityLabel={`${label}: ${value}`}>
+    <View
+      style={[
+        styles.linha,
+        { backgroundColor: palette.surface, borderColor: palette.border },
+      ]}
+      accessible
+      accessibilityLabel={`${label}: ${value}`}
+    >
       <View style={styles.linhaTopo}>
-        <Text style={styles.linhaRotulo} numberOfLines={1}>
+        <Text style={[styles.linhaRotulo, { color: palette.ink }]} numberOfLines={1}>
           {label}
         </Text>
-        <Text style={styles.linhaValor}>{value}</Text>
+        <Text
+          style={[
+            styles.linhaValor,
+            { color: isDark ? darkColors.primaryDark : colors.primary },
+          ]}
+        >
+          {value}
+        </Text>
       </View>
 
-      <View style={styles.trilho}>
+      <View style={[styles.trilho, { backgroundColor: palette.primaryGlow }]}>
         {/* Piso de 2%: tempo pequeno ainda precisa aparecer na barra. */}
         <View
           style={[styles.preenchimento, { backgroundColor: color, width: `${Math.max(2, percent)}%` }]}

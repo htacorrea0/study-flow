@@ -2,6 +2,7 @@ import type { SessionItem as Session } from '@study-flow/shared';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fontFamilies, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { SessionItem } from '@/views/_templates/_sessionItem';
 
 type SessionListProps = {
@@ -17,10 +18,12 @@ type SessionListProps = {
  * não um botão para uma tela que ainda não faz isso.
  */
 export function SessionList({ sessions, onSeeAll }: SessionListProps) {
+  const { isDark } = useTheme();
+
   return (
     <View>
       <View style={styles.cabecalho}>
-        <Text style={styles.titulo}>Próximas sessões</Text>
+        <Text style={[styles.titulo, isDark && styles.textoClaro]}>Próximas sessões</Text>
         <Pressable onPress={onSeeAll} accessibilityRole="button" hitSlop={8}>
           <Text style={styles.verTodas}>Ver todas</Text>
         </Pressable>
@@ -28,7 +31,7 @@ export function SessionList({ sessions, onSeeAll }: SessionListProps) {
 
       <View style={styles.lista}>
         {sessions.length === 0 ? (
-          <Text style={styles.vazio}>
+          <Text style={[styles.vazio, isDark && styles.subtituloEscuro]}>
             Nenhuma sessão planejada ainda. Cadastre suas matérias e as avaliações de cada
             uma para o Study Flow montar seu plano.
           </Text>
@@ -64,5 +67,11 @@ const styles = StyleSheet.create({
   vazio: {
     ...typography.screenSubtitle,
     paddingHorizontal: spacing.xs,
+  },
+  textoClaro: {
+    color: '#f8fafc',
+  },
+  subtituloEscuro: {
+    color: '#cbd5e1',
   },
 });

@@ -1,7 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons';
-import { colors, spacing, typography } from '@/theme';
+import { colors, darkColors, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type MonthSelectorProps = {
   readonly label: string;
@@ -14,27 +15,38 @@ const LADO_DO_ICONE = 14;
 
 /** Mês em foco e as duas setas, nó `5:891`. */
 export function MonthSelector({ label, onPrevious, onNext }: MonthSelectorProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <View style={styles.linha}>
-      <Text style={styles.mes}>{label}</Text>
+      <Text style={[styles.mes, { color: palette.ink }]}>{label}</Text>
 
       <View style={styles.setas}>
         <Pressable
           onPress={onPrevious}
           accessibilityRole="button"
           accessibilityLabel="Mês anterior"
-          style={({ pressed }) => [styles.botao, pressed ? styles.pressed : null]}
+          style={({ pressed }) => [
+            styles.botao,
+            { backgroundColor: palette.surface, borderColor: palette.border },
+            pressed ? styles.pressed : null,
+          ]}
         >
-          <ChevronLeftIcon size={LADO_DO_ICONE} color={colors.ink} />
+          <ChevronLeftIcon size={LADO_DO_ICONE} color={palette.ink} />
         </Pressable>
 
         <Pressable
           onPress={onNext}
           accessibilityRole="button"
           accessibilityLabel="Próximo mês"
-          style={({ pressed }) => [styles.botao, pressed ? styles.pressed : null]}
+          style={({ pressed }) => [
+            styles.botao,
+            { backgroundColor: palette.surface, borderColor: palette.border },
+            pressed ? styles.pressed : null,
+          ]}
         >
-          <ChevronRightIcon size={LADO_DO_ICONE} color={colors.ink} />
+          <ChevronRightIcon size={LADO_DO_ICONE} color={palette.ink} />
         </Pressable>
       </View>
     </View>
@@ -59,8 +71,6 @@ const styles = StyleSheet.create({
   },
   botao: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: spacing.sm,
     borderWidth: 1,
     height: LADO_DO_BOTAO,

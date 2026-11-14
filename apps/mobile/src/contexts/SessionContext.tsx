@@ -33,6 +33,7 @@ type SessionValue = {
   signUp: (input: SignUpInput) => Promise<void>;
   signIn: (input: SignInInput) => Promise<void>;
   signOut: () => Promise<void>;
+  updateUser: (user: PublicUser) => void;
 };
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -130,6 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // aparelho. A alternativa, uma tabela de sessões no banco, está
       // registrada em docs/decisoes-arquiteturais.md.
       signOut: discardSession,
+      updateUser: setUser,
     }),
     [status, user, applySession, discardSession],
   );

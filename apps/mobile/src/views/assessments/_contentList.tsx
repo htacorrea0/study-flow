@@ -4,7 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BookOpenIcon, CheckIcon, ClockIcon, PlusIcon, Trash2Icon } from '@/components/icons';
 import { Button, Card, ListRow, Segmented, TextField } from '@/components/ui';
 import type { AssessmentFormController } from '@/controllers/assessments/AssessmentFormController';
-import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { colors, darkColors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 /** Quanto a pessoa quer se aprofundar, na ordem de menos para mais estudo. */
 const PROFUNDIDADES: readonly { readonly value: StudyDepth; readonly label: string }[] = [
@@ -51,13 +52,15 @@ function apoio(minutes: number | null, depth: StudyDepth, done: boolean): string
  */
 export function ContentList({ controller }: ContentListProps) {
   const { contentEditor } = controller;
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
 
   return (
     <View style={styles.bloco}>
-      <Text style={styles.titulo}>O que estudar</Text>
+      <Text style={[styles.titulo, { color: palette.ink }]}>O que estudar</Text>
 
       {controller.contents.length === 0 ? (
-        <Text style={styles.vazio}>
+        <Text style={[styles.vazio, { color: palette.textMuted }]}>
           Nenhum conteúdo ainda. Liste o que precisa estudar e o app espalha isso nos dias até
           o prazo.
         </Text>

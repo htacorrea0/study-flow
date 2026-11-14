@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CheckIcon } from '@/components/icons';
 import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type CheckboxProps = {
   /** Texto à direita do quadrado. Vira o rótulo de acessibilidade. */
@@ -40,6 +41,7 @@ export function Checkbox({
   indeterminate = false,
   disabled = false,
 }: CheckboxProps) {
+  const { isDark } = useTheme();
   const marcada = checked || indeterminate;
 
   return (
@@ -57,7 +59,11 @@ export function Checkbox({
         disabled ? styles.disabled : null,
       ]}
     >
-      <View style={[styles.caixa, marcada ? styles.caixaMarcada : null]}>
+      <View style={[
+        styles.caixa,
+        isDark && styles.caixaEscura,
+        marcada ? styles.caixaMarcada : null,
+      ]}>
         {indeterminate ? (
           <View style={styles.traco} />
         ) : checked ? (
@@ -66,8 +72,14 @@ export function Checkbox({
       </View>
 
       <View style={styles.textos}>
-        <Text style={[styles.label, checked ? styles.labelMarcado : null]}>{label}</Text>
-        {hint === undefined ? null : <Text style={styles.hint}>{hint}</Text>}
+        <Text style={[
+          styles.label,
+          isDark && styles.textoClaro,
+          checked ? styles.labelMarcado : null,
+        ]}>{label}</Text>
+        {hint === undefined ? null : (
+          <Text style={[styles.hint, isDark && styles.hintEscuro]}>{hint}</Text>
+        )}
       </View>
     </Pressable>
   );
@@ -118,5 +130,15 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typography.caption,
+  },
+  caixaEscura: {
+    backgroundColor: '#1f2937',
+    borderColor: '#64748b',
+  },
+  textoClaro: {
+    color: '#f8fafc',
+  },
+  hintEscuro: {
+    color: '#cbd5e1',
   },
 });

@@ -51,3 +51,23 @@ export async function create(data: CreateUserData): Promise<User> {
     },
   });
 }
+
+export async function update(
+  id: string,
+  data: { name?: string; email?: string },
+): Promise<User | null> {
+  const result = await prisma.user.updateMany({
+    where: { id },
+    data: {
+      ...(data.name === undefined ? {} : { name: data.name }),
+      ...(data.email === undefined ? {} : { email: normalizeEmail(data.email) }),
+    },
+  });
+
+  return result.count === 0 ? null : findById(id);
+}
+
+export async function updatePassword(id: string, passwordHash: string): Promise<boolean> {
+  const result = await prisma.user.updateMany({ where: { id }, data: { passwordHash } });
+  return result.count > 0;
+}

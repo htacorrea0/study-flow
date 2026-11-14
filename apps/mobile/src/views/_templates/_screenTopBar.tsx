@@ -2,7 +2,8 @@ import type { ComponentType, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ChevronLeftIcon, type IconProps } from '@/components/icons';
-import { colors, spacing, typography } from '@/theme';
+import { colors, darkColors, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type ScreenTopBarProps = {
   readonly title: string;
@@ -36,6 +37,9 @@ export function ScreenTopBar({
   onAction,
   children,
 }: ScreenTopBarProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <View style={styles.bloco}>
       <View style={styles.barra}>
@@ -46,13 +50,17 @@ export function ScreenTopBar({
             onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel="Voltar"
-            style={({ pressed }) => [styles.botao, pressed ? styles.pressed : null]}
+            style={({ pressed }) => [
+              styles.botao,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+              pressed ? styles.pressed : null,
+            ]}
           >
-            <ChevronLeftIcon size={20} color={colors.ink} />
+            <ChevronLeftIcon size={20} color={palette.ink} />
           </Pressable>
         )}
 
-        <Text style={styles.titulo} numberOfLines={1}>
+        <Text style={[styles.titulo, { color: palette.ink }]} numberOfLines={1}>
           {title}
         </Text>
 
@@ -63,9 +71,13 @@ export function ScreenTopBar({
             onPress={onAction}
             accessibilityRole="button"
             accessibilityLabel={actionLabel ?? 'Ação'}
-            style={({ pressed }) => [styles.botao, pressed ? styles.pressed : null]}
+            style={({ pressed }) => [
+              styles.botao,
+              { backgroundColor: palette.surface, borderColor: palette.border },
+              pressed ? styles.pressed : null,
+            ]}
           >
-            <ActionIcon size={20} color={colors.ink} />
+            <ActionIcon size={20} color={palette.ink} />
           </Pressable>
         )}
       </View>
@@ -108,5 +120,12 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  botaoEscuro: {
+    backgroundColor: '#1f2937',
+    borderColor: '#374151',
+  },
+  textoClaro: {
+    color: '#f8fafc',
   },
 });

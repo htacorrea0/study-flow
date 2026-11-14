@@ -54,7 +54,11 @@ export default function Dashboard() {
 
   return (
     <ScreenContainer edgeToEdge>
-      <DashboardHeader user={user} streakDays={streakDays} />
+      <DashboardHeader
+        user={user}
+        streakDays={streakDays}
+        onProfile={controller.goToProfile}
+      />
       <GoalCard goal={todayGoal} />
       <QuickStartButton onPress={controller.goToTimer} />
       <SessionList sessions={upcomingSessions} onSeeAll={controller.goToCalendar} />

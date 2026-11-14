@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 
 import type { IconProps } from "@/components/icons/createIcon";
 import { colors, radii, sizes, typography } from "@/theme";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type ButtonProps = {
   label?: string;
@@ -39,6 +40,7 @@ export function Button({
   icon: Icon,
   accessibilityLabel,
 }: ButtonProps) {
+  const { isDark } = useTheme();
   const isSecondary = variant === "secondary";
   const isBlocked = disabled || loading;
   const isIconOnly = Icon !== undefined && label === undefined;
@@ -53,6 +55,7 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         isSecondary ? styles.secondary : styles.preenchido,
+        isDark && isSecondary ? styles.secondaryDark : null,
         isIconOnly ? styles.iconOnly : null,
         variant === "danger" ? styles.danger : null,
         variant === "primary" ? styles.primary : null,
@@ -77,6 +80,7 @@ export function Button({
               style={[
                 styles.label,
                 isSecondary ? styles.labelSecondary : styles.labelPrimary,
+                isDark && isSecondary ? styles.labelSecondaryDark : null,
               ]}
             >
               {label}
@@ -128,5 +132,12 @@ const styles = StyleSheet.create({
   },
   labelSecondary: {
     color: colors.ink,
+  },
+  secondaryDark: {
+    backgroundColor: "#1f2937",
+    borderColor: "#374151",
+  },
+  labelSecondaryDark: {
+    color: "#f8fafc",
   },
 });

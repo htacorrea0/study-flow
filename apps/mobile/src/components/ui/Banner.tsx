@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { AlertTriangleIcon, CheckIcon, type IconProps } from '@/components/icons';
 import { colors, radii, sizes, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 import type { ComponentType } from 'react';
 
@@ -23,17 +24,18 @@ type BannerProps = {
  * é reservado para erro de formulário e ação destrutiva.
  */
 export function Banner({ tone = 'info', message }: BannerProps) {
+  const { isDark } = useTheme();
   const aviso = tone === 'warning';
   const Icone: ComponentType<IconProps> = aviso ? AlertTriangleIcon : CheckIcon;
 
   return (
     <View
-      style={[styles.caixa, aviso ? styles.aviso : styles.info]}
+      style={[styles.caixa, aviso ? styles.aviso : styles.info, isDark && styles.caixaEscura]}
       accessibilityLiveRegion="polite"
       role="status"
     >
       <Icone size={sizes.inputIcon} color={aviso ? colors.amber : colors.success} />
-      <Text style={styles.texto}>{message}</Text>
+      <Text style={[styles.texto, isDark && styles.textoEscuro]}>{message}</Text>
     </View>
   );
 }
@@ -56,5 +58,11 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.ink,
     flex: 1,
+  },
+  caixaEscura: {
+    backgroundColor: '#263449',
+  },
+  textoEscuro: {
+    color: '#f8fafc',
   },
 });

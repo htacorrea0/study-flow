@@ -5,4 +5,10 @@
  * igual ao servidor. Este arquivo é só o ponto de entrada da API, mantendo o
  * padrão de `src/schemas/` para as rotas.
  */
-export { signInSchema, signUpSchema } from '@study-flow/shared';
+export {
+  signInSchema,
+  signUpSchema,
+  updateNotificationPreferencesSchema,
+  updatePasswordSchema,
+  updateProfileSchema,
+} from '@study-flow/shared';

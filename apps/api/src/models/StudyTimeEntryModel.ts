@@ -54,6 +54,15 @@ export async function findRecordedTimestampsSince(
   return registros.map((registro) => registro.recordedAt);
 }
 
+export async function sumAllSeconds(userId: string): Promise<number> {
+  const result = await prisma.studyTimeEntry.aggregate({
+    where: { userId },
+    _sum: { seconds: true },
+  });
+
+  return result._sum.seconds ?? 0;
+}
+
 /** Bloco de tempo com a matéria, para somar o mês por dia e por matéria. */
 export interface StudyTimeEntryWithSubject {
   readonly seconds: number;

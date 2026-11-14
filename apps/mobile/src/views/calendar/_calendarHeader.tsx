@@ -1,7 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CalendarIcon } from '@/components/icons';
-import { colors, spacing, typography } from '@/theme';
+import { colors, darkColors, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 type CalendarHeaderProps = {
   readonly onGoToToday: () => void;
@@ -19,17 +20,24 @@ const LADO_DO_BOTAO = 40;
  * do design.
  */
 export function CalendarHeader({ onGoToToday }: CalendarHeaderProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <View style={styles.header}>
-      <Text style={styles.titulo}>Agenda de estudos</Text>
+      <Text style={[styles.titulo, { color: palette.ink }]}>Agenda de estudos</Text>
 
       <Pressable
         onPress={onGoToToday}
         accessibilityRole="button"
         accessibilityLabel="Ir para hoje"
-        style={({ pressed }) => [styles.botao, pressed ? styles.pressed : null]}
+        style={({ pressed }) => [
+          styles.botao,
+          { backgroundColor: palette.surface, borderColor: palette.border },
+          pressed ? styles.pressed : null,
+        ]}
       >
-        <CalendarIcon size={20} color={colors.ink} />
+        <CalendarIcon size={20} color={palette.ink} />
       </Pressable>
     </View>
   );
@@ -48,8 +56,6 @@ const styles = StyleSheet.create({
   },
   botao: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
     borderRadius: LADO_DO_BOTAO / 2,
     borderWidth: 1,
     height: LADO_DO_BOTAO,

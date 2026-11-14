@@ -1,7 +1,8 @@
 import type { CalendarAssessment, SessionItem as Session } from '@study-flow/shared';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { spacing, typography } from '@/theme';
+import { colors, darkColors, spacing, typography } from '@/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { SessionItem } from '@/views/_templates/_sessionItem';
 import { SkeletonBlock } from '@/views/_templates/_skeletonBlock';
 import { radii } from '@/theme';
@@ -27,9 +28,12 @@ type AgendaListProps = {
  * nada marcado" é exatamente o que vale a pena saber.
  */
 export function AgendaList({ title, assessments, sessions, loading }: AgendaListProps) {
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
+
   return (
     <View style={styles.secao}>
-      <Text style={styles.titulo}>{title}</Text>
+      <Text style={[styles.titulo, { color: palette.ink }]}>{title}</Text>
 
       <View style={styles.lista}>
         {loading ? (
@@ -68,5 +72,6 @@ const styles = StyleSheet.create({
   },
   vazio: {
     ...typography.screenSubtitle,
+    color: colors.textMuted,
   },
 });

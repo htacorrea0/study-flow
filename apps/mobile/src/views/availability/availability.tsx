@@ -10,7 +10,8 @@ import {
   TextField,
 } from "@/components/ui";
 import { useAvailabilityController } from "@/controllers/availability/AvailabilityController";
-import { colors, spacing, typography } from "@/theme";
+import { colors, darkColors, spacing, typography } from "@/theme";
+import { useTheme } from "@/contexts/ThemeContext";
 import { ErrorState } from "@/views/_templates/_errorState";
 import { ScreenTopBar } from "@/views/_templates/_screenTopBar";
 import { SkeletonBlock } from "@/views/_templates/_skeletonBlock";
@@ -47,6 +48,8 @@ function totalLegivel(minutes: number): string {
  */
 export default function Availability() {
   const controller = useAvailabilityController();
+  const { isDark } = useTheme();
+  const palette = isDark ? darkColors : colors;
 
   if (controller.status === "error") {
     return (
@@ -66,7 +69,7 @@ export default function Availability() {
   return (
     <ScreenContainer>
       <ScreenTopBar title="Disponibilidade" onBack={controller.goBack}>
-        <Text style={styles.explicacao}>
+        <Text style={[styles.explicacao, { color: palette.textMuted }]}>
           Quantos minutos você consegue estudar em cada dia. Dia com zero fica
           de fora da distribuição.
         </Text>
