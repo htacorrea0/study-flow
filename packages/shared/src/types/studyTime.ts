@@ -27,3 +27,25 @@ export interface RegisterStudyTimeResponse {
   /** Total já acumulado para o dia civil da pessoa. */
   readonly totalSecondsToday: number;
 }
+
+export interface MonthlyStudyTimeQueryInput {
+  readonly month?: string;
+}
+
+export interface MonthlyStudyTimeSubject {
+  readonly subjectId: string | null;
+  readonly name: string;
+  readonly seconds: number;
+  readonly color: string | null;
+}
+
+export interface MonthlyStudyTimeResponse {
+  readonly month: string;
+  readonly totalSeconds: number;
+  readonly daysStudied: number;
+  readonly days: readonly {
+    readonly date: string;
+    readonly seconds: number;
+  }[];
+  readonly subjects: readonly MonthlyStudyTimeSubject[];
+}

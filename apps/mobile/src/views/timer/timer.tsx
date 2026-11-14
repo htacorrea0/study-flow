@@ -1,25 +1,40 @@
-import { useRef, useState, type ComponentRef } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRef, useState, type ComponentRef } from "react";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
-import { InfoIcon } from '@/components/icons';
+import { InfoIcon } from "@/components/icons";
 
-import { Button, Card, ConfirmDialog, ScreenContainer, Segmented } from '@/components/ui';
-import { useTimerController } from '@/controllers/timer/TimerController';
-import { colors, radii, sizes, spacing, typography } from '@/theme';
-import { formatStudyDuration } from '@/utils/duration';
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  ScreenContainer,
+  Segmented,
+} from "@/components/ui";
+import { useTimerController } from "@/controllers/timer/TimerController";
+import { colors, radii, sizes, spacing, typography } from "@/theme";
+import { formatStudyDuration } from "@/utils/duration";
 
 /** Atalhos de duração. A digitação direta cobre qualquer outro valor. */
 const TIMER_PRESETS = [
-  { label: '5 min', seconds: 5 * 60 },
-  { label: '10 min', seconds: 10 * 60 },
-  { label: '15 min', seconds: 15 * 60 },
-  { label: '30 min', seconds: 30 * 60 },
-  { label: '1 h', seconds: 60 * 60 },
+  { label: "5 min", seconds: 5 * 60 },
+  { label: "10 min", seconds: 10 * 60 },
+  { label: "15 min", seconds: 15 * 60 },
+  { label: "30 min", seconds: 30 * 60 },
+  { label: "1 h", seconds: 60 * 60 },
 ] as const;
 
 const MODE_OPTIONS = [
-  { value: 'timer', label: 'Timer' },
-  { value: 'cronometro', label: 'Cronômetro' },
+  { value: "timer", label: "Timer" },
+  { value: "cronometro", label: "Cronômetro" },
+  { value: "pomodoro", label: "Pomodoro" },
 ] as const;
 
 /**
@@ -41,7 +56,10 @@ export default function Timer() {
           accessibilityRole="button"
           accessibilityLabel="Como funciona"
           hitSlop={8}
-          style={({ pressed }) => [styles.infoButton, pressed ? styles.infoPressed : null]}
+          style={({ pressed }) => [
+            styles.infoButton,
+            pressed ? styles.infoPressed : null,
+          ]}
         >
           <InfoIcon size={22} color={colors.primary} />
         </Pressable>
@@ -49,11 +67,19 @@ export default function Timer() {
 
       <InfoDialog
         visible={infoVisible}
-        title={controller.mode === 'timer' ? 'Como funciona o timer' : 'Como funciona o cronômetro'}
+        title={
+          controller.mode === "timer"
+            ? "Como funciona o timer"
+            : controller.mode === "cronometro"
+              ? "Como funciona o cronômetro"
+              : "Como funciona o Pomodoro"
+        }
         message={
-          controller.mode === 'timer'
-            ? 'Toque no tempo e digite quanto quer estudar, como no relógio do celular. Ao pausar ou terminar, você pode salvar o tempo no seu progresso. O acumulado fica em Progresso, em Tempo mensal.'
-            : 'Use para medir sessões livres, sem tempo fixo. Marque trechos por matéria e, ao pausar, salve o tempo no seu progresso.'
+          controller.mode === "timer"
+            ? "Toque no tempo e digite quanto quer estudar, como no relógio do celular. Ao pausar ou terminar, você pode salvar o tempo no seu progresso. O acumulado fica em Progresso, em Tempo mensal."
+            : controller.mode === "cronometro"
+              ? "Use para medir sessões livres, sem tempo fixo. Marque trechos por matéria e, ao pausar, salve o tempo no seu progresso."
+              : "Estude em ciclos configuráveis de foco e pausa. O tempo de foco é registrado no seu progresso."
         }
         onClose={() => setInfoVisible(false)}
       />
@@ -68,13 +94,13 @@ export default function Timer() {
       <View style={styles.subjectSection}>
         <Text style={styles.subjectLabel}>Matéria em foco</Text>
 
-        {controller.subjectLoadStatus === 'error' ? (
+        {controller.subjectLoadStatus === "error" ? (
           <Text style={styles.subjectError}>{controller.subjectError}</Text>
         ) : controller.subjects.length === 0 ? (
           <Text style={styles.subjectHint}>
-            {controller.subjectLoadStatus === 'loading'
-              ? 'Carregando matérias...'
-              : 'Nenhuma matéria cadastrada. O tempo será registrado sem matéria.'}
+            {controller.subjectLoadStatus === "loading"
+              ? "Carregando matérias..."
+              : "Nenhuma matéria cadastrada. O tempo será registrado sem matéria."}
           </Text>
         ) : (
           <ScrollView
@@ -93,7 +119,10 @@ export default function Timer() {
                   accessibilityRole="radio"
                   accessibilityLabel={subject.name}
                   accessibilityState={{ selected, checked: selected }}
-                  style={[styles.subjectChip, selected ? styles.subjectChipSelected : null]}
+                  style={[
+                    styles.subjectChip,
+                    selected ? styles.subjectChipSelected : null,
+                  ]}
                 >
                   <Text
                     style={[
@@ -110,7 +139,7 @@ export default function Timer() {
         )}
       </View>
 
-      {controller.mode === 'timer' ? (
+      {controller.mode === "timer" ? (
         <CountdownPanel
           remainingFormatted={controller.countdownFormatted}
           progressPercent={controller.countdownProgressPercent}
@@ -128,7 +157,7 @@ export default function Timer() {
           onStartPause={controller.startOrPauseCountdown}
           onReset={controller.resetCountdown}
         />
-      ) : (
+      ) : controller.mode === "cronometro" ? (
         <StopwatchPanel
           seconds={controller.stopwatchFormatted}
           isRunning={controller.stopwatchRunning}
@@ -136,6 +165,22 @@ export default function Timer() {
           onStartPause={controller.startOrPauseStopwatch}
           onReset={controller.resetStopwatch}
           onMarkLap={controller.markStopwatchLap}
+        />
+      ) : (
+        <PomodoroPanel
+          formatted={controller.pomodoroFormatted}
+          phase={controller.pomodoroPhase}
+          running={controller.pomodoroRunning}
+          progressPercent={controller.pomodoroProgressPercent}
+          completedFocuses={controller.pomodoroCompletedFocuses}
+          focusMinutes={controller.pomodoroFocusMinutes}
+          shortBreakMinutes={controller.pomodoroShortBreakMinutes}
+          longBreakMinutes={controller.pomodoroLongBreakMinutes}
+          onFocusMinutesChange={controller.setPomodoroFocusMinutes}
+          onShortBreakMinutesChange={controller.setPomodoroShortBreakMinutes}
+          onLongBreakMinutesChange={controller.setPomodoroLongBreakMinutes}
+          onStartPause={controller.startOrPausePomodoro}
+          onReset={controller.resetPomodoro}
         />
       )}
 
@@ -202,7 +247,12 @@ type DurationEntryProps = {
  * texto fica invisível por cima do texto formatado; ele só existe para abrir
  * o teclado numérico e receber os dígitos.
  */
-function DurationEntry({ digits, formatted, editable, onChange }: DurationEntryProps) {
+function DurationEntry({
+  digits,
+  formatted,
+  editable,
+  onChange,
+}: DurationEntryProps) {
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
   const [focused, setFocused] = useState(false);
 
@@ -218,7 +268,7 @@ function DurationEntry({ digits, formatted, editable, onChange }: DurationEntryP
         style={[
           styles.timeEntry,
           focused ? styles.timeEntryFocused : null,
-          digits === '' ? styles.timeEntryEmpty : null,
+          digits === "" ? styles.timeEntryEmpty : null,
         ]}
       >
         {formatted}
@@ -294,13 +344,19 @@ function CountdownPanel({
           <>
             <Text style={styles.time}>{remainingFormatted}</Text>
             <Text style={styles.helper}>
-              {isFinished ? 'Tempo concluído.' : isRunning ? 'Em andamento.' : 'Pausado.'}
+              {isFinished
+                ? "Tempo concluído."
+                : isRunning
+                  ? "Em andamento."
+                  : "Pausado."}
             </Text>
           </>
         )}
 
         <View style={styles.progressTrack} accessibilityElementsHidden>
-          <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+          <View
+            style={[styles.progressFill, { width: `${progressPercent}%` }]}
+          />
         </View>
 
         {canEditDuration ? (
@@ -335,10 +391,16 @@ function CountdownPanel({
                       accessibilityRole="button"
                       accessibilityLabel={preset.label}
                       accessibilityState={{ selected }}
-                      style={[styles.presetButton, selected ? styles.presetButtonSelected : null]}
+                      style={[
+                        styles.presetButton,
+                        selected ? styles.presetButtonSelected : null,
+                      ]}
                     >
                       <Text
-                        style={[styles.presetLabel, selected ? styles.presetLabelSelected : null]}
+                        style={[
+                          styles.presetLabel,
+                          selected ? styles.presetLabelSelected : null,
+                        ]}
                       >
                         {preset.label}
                       </Text>
@@ -353,7 +415,13 @@ function CountdownPanel({
 
       <View style={styles.actions}>
         <Button
-          label={isFinished ? 'Reiniciar e iniciar' : isRunning ? 'Pausar' : 'Iniciar'}
+          label={
+            isFinished
+              ? "Reiniciar e iniciar"
+              : isRunning
+                ? "Pausar"
+                : "Iniciar"
+          }
           onPress={onStartPause}
           disabled={!canStart}
         />
@@ -390,7 +458,7 @@ function StopwatchPanel({
         <Text style={styles.modeLabel}>Cronômetro</Text>
         <Text style={styles.time}>{seconds}</Text>
 
-        <View style={{ paddingVertical: spacing.md, width: '100%' }}>
+        <View style={{ paddingVertical: spacing.md, width: "100%" }}>
           <Button
             label="Marcar tempo desta matéria"
             onPress={onMarkLap}
@@ -404,9 +472,13 @@ function StopwatchPanel({
           <View style={styles.lapList}>
             {laps.slice(0, 4).map((lap, index) => (
               <View key={lap.id} style={styles.lapItem}>
-                <Text style={styles.lapLabel}>Trecho {laps.length - index}</Text>
+                <Text style={styles.lapLabel}>
+                  Trecho {laps.length - index}
+                </Text>
                 <Text style={styles.lapText}>{lap.subjectName}</Text>
-                <Text style={styles.lapText}>{formatStudyDuration(lap.seconds)}</Text>
+                <Text style={styles.lapText}>
+                  {formatStudyDuration(lap.seconds)}
+                </Text>
               </View>
             ))}
           </View>
@@ -414,8 +486,119 @@ function StopwatchPanel({
       </Card>
 
       <View style={styles.actions}>
-        <Button label={isRunning ? 'Pausar' : 'Iniciar'} onPress={onStartPause} />
+        <Button
+          label={isRunning ? "Pausar" : "Iniciar"}
+          onPress={onStartPause}
+        />
         <Button label="Zerar" onPress={onReset} variant="secondary" />
+      </View>
+    </View>
+  );
+}
+
+type PomodoroPanelProps = {
+  readonly formatted: string;
+  readonly phase: "focus" | "shortBreak" | "longBreak";
+  readonly running: boolean;
+  readonly progressPercent: number;
+  readonly completedFocuses: number;
+  readonly focusMinutes: string;
+  readonly shortBreakMinutes: string;
+  readonly longBreakMinutes: string;
+  readonly onFocusMinutesChange: (value: string) => void;
+  readonly onShortBreakMinutesChange: (value: string) => void;
+  readonly onLongBreakMinutesChange: (value: string) => void;
+  readonly onStartPause: () => void;
+  readonly onReset: () => void;
+};
+
+function PomodoroPanel({
+  formatted,
+  phase,
+  running,
+  progressPercent,
+  completedFocuses,
+  focusMinutes,
+  shortBreakMinutes,
+  longBreakMinutes,
+  onFocusMinutesChange,
+  onShortBreakMinutesChange,
+  onLongBreakMinutesChange,
+  onStartPause,
+  onReset,
+}: PomodoroPanelProps) {
+  const phaseLabel =
+    phase === "focus"
+      ? "Foco"
+      : phase === "shortBreak"
+        ? "Pausa curta"
+        : "Pausa longa";
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.pomodoroSettings}>
+        <Text style={styles.subjectLabel}>Duração dos ciclos (minutos)</Text>
+        <View style={styles.pomodoroInputs}>
+          <View style={styles.pomodoroInputGroup}>
+            <Text style={styles.pomodoroInputLabel}>Foco</Text>
+            <TextInput
+              value={focusMinutes}
+              onChangeText={onFocusMinutesChange}
+              keyboardType="number-pad"
+              maxLength={3}
+              editable={!running}
+              style={styles.pomodoroInput}
+              accessibilityLabel="Minutos de foco"
+            />
+          </View>
+          <View style={styles.pomodoroInputGroup}>
+            <Text style={styles.pomodoroInputLabel}>Pausa curta</Text>
+            <TextInput
+              value={shortBreakMinutes}
+              onChangeText={onShortBreakMinutesChange}
+              keyboardType="number-pad"
+              maxLength={3}
+              editable={!running}
+              style={styles.pomodoroInput}
+              accessibilityLabel="Minutos da pausa curta"
+            />
+          </View>
+          <View style={styles.pomodoroInputGroup}>
+            <Text style={styles.pomodoroInputLabel}>Pausa longa</Text>
+            <TextInput
+              value={longBreakMinutes}
+              onChangeText={onLongBreakMinutesChange}
+              keyboardType="number-pad"
+              maxLength={3}
+              editable={!running}
+              style={styles.pomodoroInput}
+              accessibilityLabel="Minutos da pausa longa"
+            />
+          </View>
+        </View>
+      </View>
+      <Card size="large" style={styles.timeCard}>
+        <Text style={styles.modeLabel}>{phaseLabel}</Text>
+        <Text style={styles.time}>{formatted}</Text>
+        <Text style={styles.helper}>
+          {running ? "Em andamento." : "Pronto para começar."}
+        </Text>
+
+        <View style={styles.progressTrack} accessibilityElementsHidden>
+          <View
+            style={[styles.progressFill, { width: `${progressPercent}%` }]}
+          />
+        </View>
+
+        <Text style={styles.pomodoroCount}>
+          {completedFocuses}{" "}
+          {completedFocuses === 1 ? "foco concluído" : "focos concluídos"}
+        </Text>
+      </Card>
+
+      <View style={styles.actions}>
+        <Button label={running ? "Pausar" : "Iniciar"} onPress={onStartPause} />
+        <Button label="Reiniciar ciclo" onPress={onReset} variant="secondary" />
       </View>
     </View>
   );
@@ -423,9 +606,9 @@ function StopwatchPanel({
 
 const styles = StyleSheet.create({
   header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: spacing.lg,
   },
   title: {
@@ -434,19 +617,19 @@ const styles = StyleSheet.create({
     lineHeight: 38,
   },
   infoButton: {
-    alignItems: 'center',
+    alignItems: "center",
     height: sizes.minTouchTarget,
-    justifyContent: 'center',
+    justifyContent: "center",
     width: sizes.minTouchTarget,
   },
   infoPressed: {
     opacity: 0.6,
   },
   infoBackdrop: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(30, 27, 75, 0.45)',
+    alignItems: "center",
+    backgroundColor: "rgba(30, 27, 75, 0.45)",
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: spacing.xxl,
   },
   infoBox: {
@@ -455,7 +638,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     maxWidth: 420,
     padding: spacing.xxl,
-    width: '100%',
+    width: "100%",
   },
   infoTitle: {
     ...typography.sectionTitle,
@@ -484,12 +667,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   subjectChip: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.control,
     borderWidth: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     minHeight: sizes.secondaryButtonHeight,
     paddingHorizontal: spacing.lg,
   },
@@ -510,8 +693,34 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     marginTop: spacing.lg,
   },
+  pomodoroSettings: {
+    gap: spacing.sm,
+  },
+  pomodoroInputs: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  pomodoroInputGroup: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  pomodoroInputLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  pomodoroInput: {
+    ...typography.input,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.control,
+    borderWidth: 1,
+    color: colors.ink,
+    minHeight: sizes.secondaryButtonHeight,
+    paddingHorizontal: spacing.md,
+    textAlign: "center",
+  },
   timeCard: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: spacing.md,
     paddingVertical: spacing.xxl,
   },
@@ -526,8 +735,8 @@ const styles = StyleSheet.create({
     lineHeight: 56,
   },
   entry: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     minHeight: sizes.minTouchTarget,
   },
   timeEntry: {
@@ -547,7 +756,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     opacity: 0,
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     top: 0,
   },
@@ -559,25 +768,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryGlow,
     borderRadius: radii.pill,
     height: 8,
-    overflow: 'hidden',
-    width: '100%',
+    overflow: "hidden",
+    width: "100%",
   },
   progressFill: {
     backgroundColor: colors.primary,
     borderRadius: radii.pill,
-    height: '100%',
+    height: "100%",
   },
   adjustRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    flexDirection: "row",
     gap: spacing.sm,
     marginTop: spacing.md,
   },
   adjustButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: colors.primaryGlow,
     borderRadius: radii.control,
-    justifyContent: 'center',
+    justifyContent: "center",
     minHeight: sizes.minTouchTarget,
     minWidth: 88,
     paddingHorizontal: spacing.sm,
@@ -589,7 +798,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   presetRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
@@ -597,12 +806,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   presetButton: {
-    alignItems: 'center',
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderColor: colors.border,
     borderRadius: radii.control,
     borderWidth: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     minHeight: sizes.secondaryButtonHeight,
   },
   presetButtonSelected: {
@@ -626,7 +835,7 @@ const styles = StyleSheet.create({
   lapList: {
     gap: spacing.sm,
     marginTop: spacing.sm,
-    width: '100%',
+    width: "100%",
   },
   lapItem: {
     backgroundColor: colors.primaryGlow,
@@ -653,5 +862,9 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.primary,
     marginTop: spacing.md,
+  },
+  pomodoroCount: {
+    ...typography.caption,
+    color: colors.textMuted,
   },
 });

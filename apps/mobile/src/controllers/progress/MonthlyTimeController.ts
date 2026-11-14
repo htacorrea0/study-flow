@@ -1,6 +1,6 @@
 import type { MonthlyStudyTimeResponse } from '@study-flow/shared';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { ApiError } from '@/services/api';
 import { fetchMonthlyStudyTime } from '@/services/activities/ActivityService';
@@ -36,15 +36,26 @@ export function useMonthlyTimeController(): MonthlyTimeController {
   const [status, setStatus] = useState<MonthlyTimeStatus>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [data, setData] = useState<MonthlyStudyTimeResponse | null>(null);
+  const requestId = useRef(0);
 
   const load = useCallback(async (target: IsoMonth): Promise<void> => {
+    const currentRequestId = requestId.current + 1;
+    requestId.current = currentRequestId;
     setStatus('loading');
     setErrorMessage(null);
+    setData(null);
 
     try {
-      setData(await fetchMonthlyStudyTime(target));
+      const resposta = await fetchMonthlyStudyTime(target);
+      if (requestId.current !== currentRequestId) {
+        return;
+      }
+      setData(resposta);
       setStatus('ready');
     } catch (error) {
+      if (requestId.current !== currentRequestId) {
+        return;
+      }
       setErrorMessage(
         error instanceof ApiError ? error.message : 'Não foi possível carregar o tempo do mês.',
       );

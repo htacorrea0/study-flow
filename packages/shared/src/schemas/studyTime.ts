@@ -20,4 +20,9 @@ export const registerStudyTimeSchema = z.object({
   source: z.enum(STUDY_TIME_SOURCES),
 });
 
-export type RegisterStudyTimeInput = z.infer<typeof registerStudyTimeSchema>;
+export const monthlyStudyTimeQuerySchema = z.object({
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Informe o mês no formato AAAA-MM.')
+    .optional(),
+});
