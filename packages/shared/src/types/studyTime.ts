@@ -10,15 +10,13 @@
 export const STUDY_TIME_SOURCES = ['TIMER', 'STOPWATCH'] as const;
 export type StudyTimeSource = (typeof STUDY_TIME_SOURCES)[number];
 
-/** Corpo de `POST /activities/study-time`. */
-export interface RegisterStudyTimeInput {
-  /** Tempo estudado neste trecho, sempre em segundos. */
-  readonly seconds: number;
-  /** Matéria em foco no trecho, quando houver. */
-  readonly subjectId?: string;
-  /** Se veio do timer regressivo ou do cronômetro. */
-  readonly source: StudyTimeSource;
-}
+/*
+ * O corpo de `POST /activities/study-time` não é declarado aqui: ele nasce do
+ * `registerStudyTimeSchema`, em `schemas/studyTime.ts`, como acontece com os
+ * outros contratos de escrita. Declarar a mesma forma nos dois lugares faria
+ * o pacote exportar dois `RegisterStudyTimeInput`, e a versão escrita à mão
+ * envelheceria em silêncio quando a validação mudasse.
+ */
 
 /** Resposta de `POST /activities/study-time`. */
 export interface RegisterStudyTimeResponse {
@@ -26,26 +24,44 @@ export interface RegisterStudyTimeResponse {
   readonly recordedSeconds: number;
   /** Total já acumulado para o dia civil da pessoa. */
   readonly totalSecondsToday: number;
+  /**
+   * A sessão do plano fechou com este registro.
+   *
+   * `null` quando não havia sessão: o cronômetro solto não tem o que fechar,
+   * e a tela precisa distinguir isso de "havia sessão e ela não fechou".
+   */
+  readonly activityCompleted: boolean | null;
+  /** Quanto ainda falta para a sessão fechar. Zero quando ela já fechou. */
+  readonly activityRemainingMinutes: number | null;
 }
 
-export interface MonthlyStudyTimeQueryInput {
-  readonly month?: string;
+/** Um dia do mês em que houve estudo registrado. */
+export interface MonthlyStudyTimeDay {
+  /** Data civil `AAAA-MM-DD` no fuso da pessoa. */
+  readonly date: string;
+  readonly seconds: number;
 }
 
+/**
+ * Quanto tempo foi para cada matéria no mês.
+ *
+ * `subjectId` nulo é o tempo registrado sem matéria escolhida, que o
+ * cronômetro permite: some com o resto em vez de desaparecer do total.
+ */
 export interface MonthlyStudyTimeSubject {
   readonly subjectId: string | null;
   readonly name: string;
-  readonly seconds: number;
   readonly color: string | null;
+  readonly seconds: number;
 }
 
+/** Resposta de `GET /activities/study-time/monthly`. */
 export interface MonthlyStudyTimeResponse {
+  /** Mês civil `AAAA-MM` que a resposta cobre. */
   readonly month: string;
   readonly totalSeconds: number;
+  /** Quantos dias do mês tiveram algum registro. */
   readonly daysStudied: number;
-  readonly days: readonly {
-    readonly date: string;
-    readonly seconds: number;
-  }[];
+  readonly days: readonly MonthlyStudyTimeDay[];
   readonly subjects: readonly MonthlyStudyTimeSubject[];
 }

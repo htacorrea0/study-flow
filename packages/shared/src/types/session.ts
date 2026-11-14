@@ -32,6 +32,10 @@ export interface SessionItem {
   readonly daysUntilDue: number;
   readonly estimatedMinutes: number;
   readonly status: ActivityStatus;
+  /** Qual passada do conteúdo esta sessão é: 0 é a primeira, 1 a primeira revisão. */
+  readonly passIndex: number;
+  /** O mesmo, já em palavras: "1ª leitura", "1ª revisão". */
+  readonly passLabel: string;
   /** Data civil em que a sessão está agendada, no formato `AAAA-MM-DD`. */
   readonly scheduledDate: string;
 }

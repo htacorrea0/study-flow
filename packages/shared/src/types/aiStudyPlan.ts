@@ -1,4 +1,5 @@
-import type { Weekday } from './domain';
+import type { PlanConflict } from './activity';
+import type { AssessmentType, Weekday } from './domain';
 
 /**
  * Contratos do assistente de plano de estudos com o Gemini.
@@ -95,6 +96,26 @@ export interface AiPlanDay {
   readonly sessions: readonly AiPlanSession[];
 }
 
+/**
+ * Uma prova ou entrega que o Gemini encontrou no plano de aulas.
+ *
+ * É o que liga o plano da IA ao calendário: o planejador do app é
+ * deadline-first e só agenda conteúdo preso a uma avaliação com data. Sem
+ * esta lista, o plano continua sendo uma grade semanal que não vira sessão
+ * nenhuma.
+ *
+ * `date` é dia civil (`AAAA-MM-DD`), sem hora: o plano de aulas quase nunca
+ * traz horário, e inventar um deslocaria o prazo de fuso.
+ */
+export interface AiPlanAssessment {
+  /** Nome da matéria, como aparece em `subjects[].name`. */
+  readonly subject: string;
+  readonly title: string;
+  /** Dia civil `AAAA-MM-DD`. */
+  readonly date: string;
+  readonly type: AssessmentType;
+}
+
 /** Plano de estudos estruturado devolvido pelo Gemini. */
 export interface AiStudyPlan {
   readonly title: string;
@@ -104,6 +125,8 @@ export interface AiStudyPlan {
   readonly durationWeeks?: number;
   readonly subjects: readonly AiPlanSubject[];
   readonly weeklySchedule: readonly AiPlanDay[];
+  /** Prazos lidos do material. Ausente quando o plano de aulas não trouxe data. */
+  readonly assessments?: readonly AiPlanAssessment[];
   readonly tips: readonly string[];
 }
 
@@ -130,4 +153,32 @@ export interface SavedAiStudyPlanResponse {
   readonly plan: AiStudyPlan | null;
   /** ISO 8601. `null` quando não há plano salvo. */
   readonly savedAt: string | null;
+}
+
+/**
+ * Corpo de `POST /ai/study-plan/apply`.
+ *
+ * `deadlines` são as datas que a pessoa informou na hora de aplicar, para as
+ * matérias que a IA não conseguiu datar. Sem prazo o planejador não tem o
+ * que agendar, então a matéria entra no app mas não aparece no calendário.
+ */
+export interface ApplyAiStudyPlanInput {
+  readonly plan: AiStudyPlan;
+  readonly deadlines?: readonly { readonly subject: string; readonly date: string }[];
+}
+
+/** Resposta de `POST /ai/study-plan/apply`. */
+export interface ApplyAiStudyPlanResponse {
+  /** Matérias criadas agora. As que já existiam não entram. */
+  readonly createdSubjects: readonly string[];
+  /** Avaliações criadas agora. Repetidas e com data passada ficam de fora. */
+  readonly createdAssessments: number;
+  /** Conteúdos criados a partir dos tópicos das matérias. */
+  readonly createdContents: number;
+  /**
+   * Matérias que ficaram sem prazo e, por isso, sem sessão no calendário.
+   * A tela usa esta lista para explicar por que o calendário não se moveu.
+   */
+  readonly subjectsWithoutDeadline: readonly string[];
+  readonly conflicts: readonly PlanConflict[];
 }

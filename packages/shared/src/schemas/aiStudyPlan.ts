@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 import { AI_CHAT_ROLES, AI_PLAN_PRIORITIES } from '../types/aiStudyPlan';
-import { WEEKDAYS } from '../types/domain';
+import { ASSESSMENT_TYPES, WEEKDAYS } from '../types/domain';
+import { isoDateSchema } from './common';
 
 /**
  * Validação do corpo de `POST /ai/study-plan/chat`.
@@ -66,6 +67,21 @@ export type AiStudyPlanChatInput = z.infer<typeof aiStudyPlanChatSchema>;
 const textoCurto = (max: number) => z.string().trim().max(max);
 const minutosSemana = z.number().int().min(0).max(7 * 24 * 60);
 
+/**
+ * Uma avaliação lida do plano de aulas.
+ *
+ * Separado do plano porque a lista é tolerante: avaliação malformada é
+ * descartada em silêncio, e não derruba o plano inteiro. O modelo erra uma
+ * data em dez; perder as outras nove por causa dela seria pior do que
+ * perder aquela.
+ */
+export const aiPlanAssessmentSchema = z.object({
+  subject: textoCurto(120).min(1),
+  title: textoCurto(200).min(1),
+  date: isoDateSchema,
+  type: z.enum(ASSESSMENT_TYPES),
+});
+
 export const aiStudyPlanSchema = z.object({
   title: textoCurto(200).min(1, 'O plano precisa de um título.'),
   summary: textoCurto(2000),
@@ -100,7 +116,38 @@ export const aiStudyPlanSchema = z.object({
       }),
     )
     .max(7),
+  assessments: z
+    .array(z.unknown())
+    .max(200)
+    .transform((lista) =>
+      lista.flatMap((item) => {
+        const resultado = aiPlanAssessmentSchema.safeParse(item);
+        return resultado.success ? [resultado.data] : [];
+      }),
+    )
+    .optional(),
   tips: z.array(textoCurto(500)).max(30),
 });
 
 export type AiStudyPlanInput = z.infer<typeof aiStudyPlanSchema>;
+
+/**
+ * Corpo de `POST /ai/study-plan/apply`.
+ *
+ * O plano vem inteiro, e não por identificador, porque o plano que a pessoa
+ * está aplicando é o que está na tela: ele pode nem ter sido salvo ainda.
+ */
+export const applyAiStudyPlanSchema = z.object({
+  plan: aiStudyPlanSchema,
+  deadlines: z
+    .array(
+      z.object({
+        subject: textoCurto(120).min(1),
+        date: isoDateSchema,
+      }),
+    )
+    .max(40)
+    .optional(),
+});
+
+export type ApplyAiStudyPlanBody = z.infer<typeof applyAiStudyPlanSchema>;

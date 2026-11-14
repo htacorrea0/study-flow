@@ -11,6 +11,23 @@
  * varia dentro da mesma prova.
  */
 
+/**
+ * Paleta usada quando a cor não vem de uma escolha da pessoa.
+ *
+ * Fica no pacote compartilhado porque quem cria matéria sem perguntar a cor
+ * é a API (ao aplicar o plano da IA), e o app precisa das mesmas cores no
+ * seletor para que uma matéria criada pelo plano e outra criada à mão não
+ * pareçam de aplicativos diferentes.
+ */
+export const SUBJECT_COLOR_PALETTE = [
+  '#4f46e5',
+  '#f43f5e',
+  '#f59e0b',
+  '#a855f7',
+  '#10b981',
+  '#0ea5e9',
+] as const;
+
 /** Uma matéria na lista. */
 export interface SubjectResponse {
   readonly id: string;

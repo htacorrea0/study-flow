@@ -10,6 +10,7 @@
  */
 
 export * from './types/domain';
+export * from './utils/subjectName';
 export * from './types/api';
 export * from './types/auth';
 export * from './types/session';
@@ -21,6 +22,7 @@ export * from './types/availability';
 export * from './types/activity';
 export * from './types/studyTime';
 export * from './types/aiStudyPlan';
+export * from './types/resource';
 export * from './schemas/common';
 export * from './schemas/auth';
 export * from './schemas/calendar';
@@ -30,3 +32,4 @@ export * from './schemas/availability';
 export * from './schemas/activity';
 export * from './schemas/studyTime';
 export * from './schemas/aiStudyPlan';
+export * from './schemas/resource';

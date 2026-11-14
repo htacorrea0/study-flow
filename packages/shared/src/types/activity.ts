@@ -9,15 +9,18 @@ import type { CalendarDayResponse } from './calendar';
  */
 
 /**
- * Por que o plano não coube.
+ * O que o recálculo precisou dizer sobre o plano.
  *
- * `INSUFFICIENT_TIME`: o conteúdo foi agendado mesmo assim, estourando os
- * minutos livres do dia. `NO_AVAILABLE_DAY`: não existe nenhum dia de estudo
- * entre hoje e o prazo. `ASSESSMENT_IN_THE_PAST`: o prazo já passou e não há
- * onde agendar. Nos três casos a pessoa precisa saber: nenhum conteúdo some
- * em silêncio.
+ * `COMPRESSED_PLAN`: coube, mas em ritmo menor do que a intensidade pedida —
+ * é aviso, não erro. `INSUFFICIENT_TIME`: nem no tempo mínimo por sessão
+ * coube, e o conteúdo foi agendado estourando os minutos livres do dia.
+ * `NO_AVAILABLE_DAY`: não existe nenhum dia de estudo entre hoje e o prazo.
+ * `ASSESSMENT_IN_THE_PAST`: o prazo já passou e não há onde agendar. Nos
+ * quatro casos a pessoa precisa saber: nenhum conteúdo some em silêncio e
+ * nenhum tempo encolhe sem explicação.
  */
 export const PLAN_CONFLICT_KINDS = [
+  'COMPRESSED_PLAN',
   'INSUFFICIENT_TIME',
   'NO_AVAILABLE_DAY',
   'ASSESSMENT_IN_THE_PAST',
@@ -32,6 +35,13 @@ export interface PlanConflict {
   readonly message: string;
   /** Minutos que faltaram, só em `INSUFFICIENT_TIME`. */
   readonly deficitMinutes?: number;
+  /** Quanto do tempo pedido sobrou, de 0 a 100, só em `COMPRESSED_PLAN`. */
+  readonly compressionPercent?: number;
+}
+
+/** Resposta de `GET /plan/conflicts`: os avisos do plano ativo. */
+export interface PlanConflictsResponse {
+  readonly conflicts: readonly PlanConflict[];
 }
 
 /** O que a pessoa marcou para uma sessão. */
