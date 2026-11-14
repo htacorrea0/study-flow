@@ -1,8 +1,7 @@
-import type { ConfirmDayInput, DayConfirmationResponse, PlanConflict } from '@study-flow/shared';
+import type { ConfirmDayInput, DayConfirmationResponse } from '@study-flow/shared';
 
 import { prisma } from '../config/prisma';
 import type { TransactionClient } from '../config/prisma';
-import { toPlanConflicts } from '../dtos/PlanDto';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../errors/HttpErrors';
 import type { ActivityForConfirmation } from '../models/StudyActivityModel';
 import * as studyActivityModel from '../models/StudyActivityModel';
@@ -137,19 +136,13 @@ export async function confirm(
   // continua sendo hoje.
   const proximoDia = end.getTime() > now.getTime() ? end : now;
 
-  const conflicts: PlanConflict[] = [];
-  for (const assessmentId of afetadas) {
-    const resultado = await planService.recalculate(
-      userId,
-      { kind: 'assessment', assessmentId },
-      proximoDia,
-    );
-    conflicts.push(...toPlanConflicts(resultado));
+  if (afetadas.length > 0) {
+    await planService.recalculate(userId, proximoDia);
   }
 
   return {
     day: await CalendarService.getDay(userId, input.date, now),
     recalculated: afetadas.length > 0,
-    conflicts,
+    conflicts: await planService.listConflicts(userId),
   };
 }

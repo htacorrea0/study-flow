@@ -7,7 +7,6 @@ import type {
 } from '@study-flow/shared';
 
 import { toAssessmentListItem, toAssessmentResponse } from '../dtos/AssessmentDto';
-import { toPlanConflicts } from '../dtos/PlanDto';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../errors/HttpErrors';
 import * as assessmentModel from '../models/AssessmentModel';
 import * as subjectModel from '../models/SubjectModel';
@@ -100,15 +99,11 @@ export async function create(
     input.contents ?? [],
   );
 
-  const resultado = await planService.recalculate(
-    userId,
-    { kind: 'assessment', assessmentId: criada.id },
-    now,
-  );
+  await planService.recalculate(userId, now);
 
   return {
     assessment: toAssessmentResponse(criada),
-    conflicts: toPlanConflicts(resultado),
+    conflicts: await planService.listConflicts(userId),
   };
 }
 
@@ -151,27 +146,29 @@ export async function update(
 
   const prazoMudou = novoPrazo !== undefined && novoPrazo.getTime() !== atual.dueAt.getTime();
 
-  const resultado = prazoMudou
-    ? await planService.recalculate(userId, { kind: 'assessment', assessmentId: id }, now)
-    : null;
+  if (prazoMudou) {
+    await planService.recalculate(userId, now);
+  }
 
   return {
     assessment: toAssessmentResponse(atualizada),
-    conflicts: resultado === null ? [] : toPlanConflicts(resultado),
+    conflicts: await planService.listConflicts(userId),
   };
 }
 
 /**
- * Apaga a avaliação.
+ * Apaga a avaliação e refaz o plano.
  *
- * Sem recálculo de propósito. As sessões dela somem por cascata e os dias
- * ficam livres; puxar as outras matérias para esses buracos seria mexer no
- * que a pessoa não pediu para mexer. Quem quiser aproveitar o espaço muda a
- * disponibilidade ou edita a outra prova, e aí sim o plano é refeito.
+ * Apagar libera tempo, e o tempo liberado pertence às outras provas: elas
+ * estavam comprimidas por causa desta. Sem o recálculo, o cronograma
+ * continuaria apertado por um prazo que não existe mais, e o aviso dela
+ * ficaria na tela até a próxima mudança de disponibilidade.
  */
-export async function remove(userId: string, id: string): Promise<void> {
+export async function remove(userId: string, id: string, now: Date): Promise<void> {
   const removida = await assessmentModel.remove(userId, id);
   if (!removida) {
     throw new NotFoundError(NAO_ENCONTRADA);
   }
+
+  await planService.recalculate(userId, now);
 }

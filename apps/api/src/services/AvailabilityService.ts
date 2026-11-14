@@ -42,7 +42,7 @@ export async function upsertException(
     input.minutes,
     input.reason ?? null,
   );
-  const resultado = await planService.recalculate(userId, { kind: 'all' }, now);
+  const resultado = await planService.recalculate(userId, now);
   return { exception: toAvailabilityException(exception), conflicts: toPlanConflicts(resultado) };
 }
 
@@ -52,7 +52,7 @@ export async function removeException(
   now: Date,
 ): Promise<readonly PlanConflict[]> {
   await availabilityModel.deleteException(userId, new Date(`${date}T00:00:00.000Z`));
-  const resultado = await planService.recalculate(userId, { kind: 'all' }, now);
+  const resultado = await planService.recalculate(userId, now);
   return toPlanConflicts(resultado);
 }
 
@@ -65,7 +65,7 @@ export async function put(
     await availabilityModel.upsertMany(userId, input.days, tx);
   });
 
-  const resultado = await planService.recalculate(userId, { kind: 'all' }, now);
+  const resultado = await planService.recalculate(userId, now);
 
   return {
     availability: await get(userId),

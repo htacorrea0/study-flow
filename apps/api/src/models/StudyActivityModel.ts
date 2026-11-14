@@ -16,6 +16,7 @@ const SELECAO_COM_CONTEXTO = {
   estimatedMinutes: true,
   status: true,
   position: true,
+  passIndex: true,
   content: {
     select: {
       title: true,
@@ -130,6 +131,7 @@ const SELECAO_PARA_COPIA = {
   scheduledDate: true,
   estimatedMinutes: true,
   position: true,
+  passIndex: true,
   status: true,
   manuallyEdited: true,
   content: { select: { assessmentId: true } },
@@ -155,6 +157,7 @@ export interface ActivityCreateInput {
   readonly scheduledDate: Date;
   readonly estimatedMinutes: number;
   readonly position: number;
+  readonly passIndex: number;
   readonly status?: ActivityStatus;
   readonly manuallyEdited?: boolean;
 }
@@ -209,6 +212,33 @@ export async function findByIdsForUser(
   });
 }
 
+/**
+ * Seleção do crédito de tempo: o que a sessão precisa para saber se fechou e
+ * a que matéria o tempo pertence.
+ */
+const SELECAO_PARA_CREDITO = {
+  id: true,
+  contentId: true,
+  scheduledDate: true,
+  estimatedMinutes: true,
+  content: { select: { assessment: { select: { subjectId: true } } } },
+} satisfies Prisma.StudyActivitySelect;
+
+export type ActivityForTimeCredit = Prisma.StudyActivityGetPayload<{
+  select: typeof SELECAO_PARA_CREDITO;
+}>;
+
+/** Uma atividade para creditar tempo, só se o plano dela for do usuário. */
+export async function findForTimeCreditForUser(
+  userId: string,
+  activityId: string,
+): Promise<ActivityForTimeCredit | null> {
+  return prisma.studyActivity.findFirst({
+    where: { id: activityId, plan: { userId } },
+    select: SELECAO_PARA_CREDITO,
+  });
+}
+
 /** Marca o status de várias atividades de uma vez. */
 export async function updateStatus(
   userId: string,
@@ -224,4 +254,42 @@ export async function updateStatus(
     data: { status },
   });
   return atingidos.count;
+}
+
+/**
+ * Seleção da tela de detalhe: tudo o que o item de sessão precisa, mais o
+ * conteúdo em si (identificador e descrição), que é o que alimenta a busca
+ * de material, e o dia, que é o que a confirmação a partir dali precisa.
+ */
+const SELECAO_DE_DETALHE = {
+  ...SELECAO_COM_CONTEXTO,
+  planId: true,
+  contentId: true,
+  content: {
+    select: {
+      title: true,
+      description: true,
+      assessment: {
+        select: {
+          title: true,
+          type: true,
+          dueAt: true,
+          subject: { select: { name: true, color: true } },
+        },
+      },
+    },
+  },
+} satisfies Prisma.StudyActivitySelect;
+
+export type ActivityDetail = Prisma.StudyActivityGetPayload<{ select: typeof SELECAO_DE_DETALHE }>;
+
+/** Uma atividade pelo identificador, só se o plano dela for do usuário. */
+export async function findDetailForUser(
+  userId: string,
+  activityId: string,
+): Promise<ActivityDetail | null> {
+  return prisma.studyActivity.findFirst({
+    where: { id: activityId, plan: { userId } },
+    select: SELECAO_DE_DETALHE,
+  });
 }

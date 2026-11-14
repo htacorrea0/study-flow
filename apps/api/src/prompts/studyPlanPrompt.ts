@@ -42,6 +42,13 @@ em um plano de estudos semanal realista, com matérias, tópicos e tempo de estu
    na semana de uma prova, aumente o peso daquela matéria e reserve a véspera para revisão.
 6. Use nos campos "subject" exatamente os nomes de matéria que aparecem no plano de aulas
    (ou o nome já cadastrado no app, se for a mesma matéria).
+6.1. SEMPRE que o material trouxer data de prova, trabalho ou entrega, devolva cada uma em
+   "assessments", com a matéria, o título, a data em AAAA-MM-DD e o tipo (EXAM para prova,
+   ASSIGNMENT para trabalho ou entrega). É esta lista que faz o plano virar calendário no
+   app: sem data, o app não tem como marcar os dias de estudo. Só inclua datas que estejam
+   escritas no material — nunca invente, nunca estime, e não repita uma avaliação já
+   listada. Se o material não trouxer nenhuma data, omita "assessments" e diga isso no
+   "reply".
 7. Se o arquivo estiver ilegível, não for um plano de aulas ou faltar informação essencial,
    explique o que faltou no "reply", faça no máximo 2 perguntas objetivas e NÃO invente
    matérias nem datas.
@@ -121,6 +128,21 @@ export const STUDY_PLAN_RESPONSE_SCHEMA: Record<string, unknown> = {
               reason: { type: 'string' },
             },
             required: ['name', 'priority', 'weeklyMinutes', 'topics', 'reason'],
+          },
+        },
+        assessments: {
+          type: 'array',
+          description:
+            'Provas, trabalhos e entregas com data encontrados no material. Só datas que estão escritas lá.',
+          items: {
+            type: 'object',
+            properties: {
+              subject: { type: 'string', description: 'Mesmo nome usado em subjects[].name.' },
+              title: { type: 'string' },
+              date: { type: 'string', description: 'Dia civil AAAA-MM-DD, sem horário.' },
+              type: { type: 'string', enum: ['EXAM', 'ASSIGNMENT'] },
+            },
+            required: ['subject', 'title', 'date', 'type'],
           },
         },
         weeklySchedule: {

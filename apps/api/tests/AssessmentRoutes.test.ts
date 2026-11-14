@@ -206,7 +206,7 @@ describe('PATCH e DELETE /assessments/:id', () => {
       .set('Authorization', bearer());
 
     expect(res.status).toBe(204);
-    expect(remove).toHaveBeenCalledWith(USER_ID, ASSESSMENT_ID);
+    expect(remove).toHaveBeenCalledWith(USER_ID, ASSESSMENT_ID, expect.any(Date));
   });
 });
 

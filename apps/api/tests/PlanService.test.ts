@@ -23,13 +23,11 @@ vi.mock('../src/models/StudyPlanModel', () => ({
   supersedeActive: vi.fn(),
   create: vi.fn(),
 }));
-vi.mock('../src/models/StudyProgressModel', () => ({ findDonePassCountByContent: vi.fn() }));
 
 import * as assessmentModel from '../src/models/AssessmentModel';
 import * as availabilityModel from '../src/models/AvailabilityModel';
 import * as studyActivityModel from '../src/models/StudyActivityModel';
 import * as studyPlanModel from '../src/models/StudyPlanModel';
-import * as studyProgressModel from '../src/models/StudyProgressModel';
 import * as userModel from '../src/models/UserModel';
 import * as planService from '../src/services/PlanService';
 
@@ -42,7 +40,6 @@ const createMany = vi.mocked(studyActivityModel.createMany);
 const findActiveByUser = vi.mocked(studyPlanModel.findActiveByUser);
 const supersedeActive = vi.mocked(studyPlanModel.supersedeActive);
 const createPlan = vi.mocked(studyPlanModel.create);
-const findDonePasses = vi.mocked(studyProgressModel.findDonePassCountByContent);
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const PLAN_ID = '22222222-2222-4222-8222-222222222222';
@@ -94,21 +91,29 @@ function avaliacao(id: string, dueDate: string, contents: Conteudo[]): Avaliacao
 
 type AtividadeAtual = Awaited<ReturnType<typeof studyActivityModel.findAllByPlanForUser>>[number];
 
+interface AtividadeExtra {
+  readonly contentId?: string;
+  readonly status?: AtividadeAtual['status'];
+  readonly passIndex?: number;
+}
+
 function atividade(
   id: string,
   assessmentId: string,
   date: string,
   minutos: number,
   position = 0,
+  extra: AtividadeExtra = {},
 ): AtividadeAtual {
   return {
     id,
-    contentId: `conteudo-${id}`,
+    contentId: extra.contentId ?? `conteudo-${id}`,
     title: `Estudar ${id}`,
     scheduledDate: dataColuna(date),
     estimatedMinutes: minutos,
     position,
-    status: 'PLANNED',
+    status: extra.status ?? 'PLANNED',
+    passIndex: extra.passIndex ?? 0,
     manuallyEdited: false,
     content: { assessmentId },
   };
@@ -133,7 +138,6 @@ beforeEach(() => {
   findAllByPlanForUser.mockResolvedValue([]);
   findAllForUser.mockResolvedValue(SEMANA_CHEIA);
   findExceptionsInRange.mockResolvedValue([]);
-  findDonePasses.mockResolvedValue({});
   supersedeActive.mockResolvedValue(1);
   createMany.mockResolvedValue(0);
   createPlan.mockResolvedValue({
@@ -144,6 +148,7 @@ beforeEach(() => {
     horizonStart: dataColuna('2026-11-02'),
     horizonEnd: dataColuna('2026-11-06'),
     generatedAt: AGORA,
+    conflicts: [],
   });
 });
 
@@ -162,7 +167,7 @@ describe('PlanService.recalculate', () => {
   it('recusa usuário inexistente', async () => {
     findById.mockResolvedValue(null);
 
-    await expect(planService.recalculate(USER_ID, { kind: 'all' }, AGORA)).rejects.toThrow(
+    await expect(planService.recalculate(USER_ID, AGORA)).rejects.toThrow(
       'Sessão inválida. Entre novamente.',
     );
   });
@@ -171,7 +176,7 @@ describe('PlanService.recalculate', () => {
     findActiveByUser.mockResolvedValue({ id: PLAN_ID } as never);
     findPendingForPlanning.mockResolvedValue([]);
 
-    const saida = await planService.recalculate(USER_ID, { kind: 'all' }, AGORA);
+    const saida = await planService.recalculate(USER_ID, AGORA);
 
     expect(supersedeActive).toHaveBeenCalledWith(USER_ID);
     expect(createPlan).not.toHaveBeenCalled();
@@ -183,13 +188,13 @@ describe('PlanService.recalculate', () => {
       avaliacao('a', '2026-11-05', [conteudo('c1'), conteudo('c2')]),
     ]);
 
-    await planService.recalculate(USER_ID, { kind: 'all' }, AGORA);
+    await planService.recalculate(USER_ID, AGORA);
 
     expect(supersedeActive).toHaveBeenCalledTimes(1);
     expect(createPlan).toHaveBeenCalledWith(
       USER_ID,
       expect.objectContaining({
-        algorithmVersion: 'deadline-first-v1',
+        algorithmVersion: 'deadline-first-v2',
         horizonStart: dataColuna('2026-11-02'),
         horizonEnd: dataColuna('2026-11-05'),
       }),
@@ -198,7 +203,7 @@ describe('PlanService.recalculate', () => {
     expect(gravadas()).toHaveLength(2);
   });
 
-  it('copia as sessões das outras avaliações sem mudá-las de dia', async () => {
+  it('refaz o futuro de todas as avaliações, não só o da que mudou', async () => {
     findActiveByUser.mockResolvedValue({ id: PLAN_ID } as never);
     findAllByPlanForUser.mockResolvedValue([atividade('outra', 'b', '2026-11-04', 90, 0)]);
     findPendingForPlanning.mockResolvedValue([
@@ -206,30 +211,10 @@ describe('PlanService.recalculate', () => {
       avaliacao('b', '2026-11-06', [conteudo('c-b')]),
     ]);
 
-    await planService.recalculate(USER_ID, { kind: 'assessment', assessmentId: 'a' }, AGORA);
+    await planService.recalculate(USER_ID, AGORA);
 
-    const copiada = gravadas().find((item) => item.contentId === 'conteudo-outra');
-    expect(copiada?.scheduledDate).toEqual(dataColuna('2026-11-04'));
-    // O conteúdo da avaliação B não foi redistribuído: só a cópia dele está lá.
-    expect(gravadas().map((item) => item.contentId).sort()).toEqual(['c1', 'conteudo-outra']);
-  });
-
-  it('desconta da capacidade os minutos das sessões copiadas', async () => {
-    findActiveByUser.mockResolvedValue({ id: PLAN_ID } as never);
-    // Segunda e terça já estão cheias com sessões de outra avaliação.
-    findAllByPlanForUser.mockResolvedValue([
-      atividade('x', 'b', '2026-11-02', 120),
-      atividade('y', 'b', '2026-11-03', 120),
-    ]);
-    findPendingForPlanning.mockResolvedValue([
-      avaliacao('a', '2026-11-04', [conteudo('c1')]),
-      avaliacao('b', '2026-11-04', [conteudo('c-b')]),
-    ]);
-
-    await planService.recalculate(USER_ID, { kind: 'assessment', assessmentId: 'a' }, AGORA);
-
-    const nova = gravadas().find((item) => item.contentId === 'c1');
-    expect(nova?.scheduledDate).toEqual(dataColuna('2026-11-04'));
+    // A sessão futura da avaliação B não foi copiada: o conteúdo dela entrou de novo na conta.
+    expect(gravadas().map((item) => item.contentId).sort()).toEqual(['c-b', 'c1']);
   });
 
   it('preserva as sessões passadas de qualquer avaliação', async () => {
@@ -237,31 +222,31 @@ describe('PlanService.recalculate', () => {
     findAllByPlanForUser.mockResolvedValue([atividade('ontem', 'a', '2026-11-01', 60)]);
     findPendingForPlanning.mockResolvedValue([avaliacao('a', '2026-11-05', [conteudo('c1')])]);
 
-    await planService.recalculate(USER_ID, { kind: 'assessment', assessmentId: 'a' }, AGORA);
+    await planService.recalculate(USER_ID, AGORA);
 
     const passada = gravadas().find((item) => item.contentId === 'conteudo-ontem');
     expect(passada?.scheduledDate).toEqual(dataColuna('2026-11-01'));
   });
 
-  it('não copia sessão futura de avaliação que deixou de estar pendente', async () => {
+  it('preserva o passado de avaliação que deixou de estar pendente', async () => {
     findActiveByUser.mockResolvedValue({ id: PLAN_ID } as never);
-    findAllByPlanForUser.mockResolvedValue([atividade('orfa', 'apagada', '2026-11-04', 60)]);
+    findAllByPlanForUser.mockResolvedValue([
+      atividade('orfa-ontem', 'apagada', '2026-11-01', 60),
+      atividade('orfa-amanha', 'apagada', '2026-11-04', 60),
+    ]);
     findPendingForPlanning.mockResolvedValue([avaliacao('a', '2026-11-05', [conteudo('c1')])]);
 
-    await planService.recalculate(USER_ID, { kind: 'assessment', assessmentId: 'a' }, AGORA);
+    await planService.recalculate(USER_ID, AGORA);
 
-    expect(gravadas().map((item) => item.contentId)).toEqual(['c1']);
+    expect(gravadas().map((item) => item.contentId).sort()).toEqual(['c1', 'conteudo-orfa-ontem']);
   });
 
-  it('desloca a posição das sessões novas para não colidir com as copiadas', async () => {
-    findActiveByUser.mockResolvedValue({ id: PLAN_ID } as never);
-    findAllByPlanForUser.mockResolvedValue([atividade('x', 'b', '2026-11-02', 30, 0)]);
+  it('numera em sequência as posições das sessões do mesmo dia', async () => {
     findPendingForPlanning.mockResolvedValue([
-      avaliacao('a', '2026-11-02', [conteudo('c1', 30)]),
-      avaliacao('b', '2026-11-06', [conteudo('c-b')]),
+      avaliacao('a', '2026-11-02', [conteudo('c1', 30), conteudo('c2', 30)]),
     ]);
 
-    await planService.recalculate(USER_ID, { kind: 'assessment', assessmentId: 'a' }, AGORA);
+    await planService.recalculate(USER_ID, AGORA);
 
     const doDia = gravadas().filter(
       (item) => item.scheduledDate.getTime() === dataColuna('2026-11-02').getTime(),
@@ -269,24 +254,144 @@ describe('PlanService.recalculate', () => {
     expect(doDia.map((item) => item.position).sort()).toEqual([0, 1]);
   });
 
-  it('não reagenda conteúdo já concluído', async () => {
+  it('presume estudado o dia que passou sem marcação e não reagenda o conteúdo', async () => {
+    findActiveByUser.mockResolvedValue({ id: PLAN_ID } as never);
+    findAllByPlanForUser.mockResolvedValue([
+      atividade('ontem', 'a', '2026-11-01', 60, 0, { contentId: 'c1' }),
+    ]);
     findPendingForPlanning.mockResolvedValue([
       avaliacao('a', '2026-11-05', [conteudo('c1'), conteudo('c2')]),
     ]);
-    findDonePasses.mockResolvedValue({ c1: 1 });
 
-    await planService.recalculate(USER_ID, { kind: 'all' }, AGORA);
+    await planService.recalculate(USER_ID, AGORA);
 
-    expect(gravadas().map((item) => item.contentId)).toEqual(['c2']);
+    const futuras = gravadas().filter(
+      (item) => item.scheduledDate.getTime() >= dataColuna('2026-11-02').getTime(),
+    );
+    expect(futuras.map((item) => item.contentId)).toEqual(['c2']);
+  });
+
+  it('devolve para a fila o conteúdo do dia marcado como não estudado', async () => {
+    findActiveByUser.mockResolvedValue({ id: PLAN_ID } as never);
+    findAllByPlanForUser.mockResolvedValue([
+      atividade('ontem', 'a', '2026-11-01', 60, 0, { contentId: 'c1', status: 'SKIPPED' }),
+    ]);
+    findPendingForPlanning.mockResolvedValue([
+      avaliacao('a', '2026-11-05', [conteudo('c1'), conteudo('c2')]),
+    ]);
+
+    await planService.recalculate(USER_ID, AGORA);
+
+    const futuras = gravadas().filter(
+      (item) => item.scheduledDate.getTime() >= dataColuna('2026-11-02').getTime(),
+    );
+    expect(futuras.map((item) => item.contentId).sort()).toEqual(['c1', 'c2']);
+  });
+
+  it('o conteúdo não estudado há uma semana é remarcado de hoje em diante', async () => {
+    findActiveByUser.mockResolvedValue({ id: PLAN_ID } as never);
+    findAllByPlanForUser.mockResolvedValue([
+      atividade('semana-passada', 'a', '2026-10-26', 60, 0, {
+        contentId: 'c1',
+        status: 'SKIPPED',
+      }),
+    ]);
+    findPendingForPlanning.mockResolvedValue([avaliacao('a', '2026-11-06', [conteudo('c1')])]);
+
+    await planService.recalculate(USER_ID, AGORA);
+
+    const datas = gravadas()
+      .filter((item) => item.contentId === 'c1')
+      .map((item) => item.scheduledDate.getTime());
+
+    // Só sobra o dia já vivido, intocado, e os dias de hoje em diante. Nada
+    // cai entre os dois: 27/10 a 01/11 já passaram e remarcar para lá seria
+    // agendar estudo para um dia que a pessoa não tem mais como cumprir.
+    const entre = datas.filter(
+      (data) =>
+        data > dataColuna('2026-10-26').getTime() && data < dataColuna('2026-11-02').getTime(),
+    );
+    expect(entre).toEqual([]);
+    expect(datas).toContain(dataColuna('2026-10-26').getTime());
+    expect(datas.some((data) => data >= dataColuna('2026-11-02').getTime())).toBe(true);
   });
 
   it('devolve o conflito quando não há disponibilidade cadastrada', async () => {
     findAllForUser.mockResolvedValue([]);
     findPendingForPlanning.mockResolvedValue([avaliacao('a', '2026-11-05', [conteudo('c1')])]);
 
-    const saida = await planService.recalculate(USER_ID, { kind: 'all' }, AGORA);
+    const saida = await planService.recalculate(USER_ID, AGORA);
 
     expect(saida.conflicts[0]?.kind).toBe('NO_AVAILABLE_DAY');
     expect(saida.unscheduledContentIds).toEqual(['c1']);
+  });
+});
+
+/** Os avisos que foram gravados no plano novo. */
+function conflitosGravados(): readonly { kind: string; assessmentId: string }[] {
+  const chamada = createPlan.mock.calls[0];
+  return (chamada?.[1]?.conflicts ?? []) as never;
+}
+
+function conflitoGuardado(assessmentId: string, deficitMinutes = 60) {
+  return {
+    kind: 'INSUFFICIENT_TIME',
+    assessmentId,
+    message: `Faltam ${deficitMinutes} minutos.`,
+    deficitMinutes,
+  };
+}
+
+describe('PlanService: os avisos do plano', () => {
+  it('grava no plano novo o aviso que o distribuidor acabou de produzir', async () => {
+    findAllForUser.mockResolvedValue([]);
+    findPendingForPlanning.mockResolvedValue([avaliacao('a', '2026-11-05', [conteudo('c1')])]);
+
+    await planService.recalculate(USER_ID, AGORA);
+
+    expect(conflitosGravados()).toEqual([
+      expect.objectContaining({ kind: 'NO_AVAILABLE_DAY', assessmentId: 'a' }),
+    ]);
+  });
+
+  it('os avisos do plano novo são só os do recálculo, sem herdar os do anterior', async () => {
+    findActiveByUser.mockResolvedValue({
+      id: PLAN_ID,
+      conflicts: [conflitoGuardado('b')],
+    } as never);
+    findPendingForPlanning.mockResolvedValue([
+      avaliacao('a', '2026-11-05', [conteudo('c1', 30)]),
+      avaliacao('b', '2026-11-06', [conteudo('c-b', 30)]),
+    ]);
+
+    await planService.recalculate(USER_ID, AGORA);
+
+    expect(conflitosGravados()).toEqual([]);
+  });
+
+  it('descarta o que estiver gravado fora do formato de aviso', async () => {
+    findActiveByUser.mockResolvedValue({
+      id: PLAN_ID,
+      conflicts: ['lixo', { kind: 'INVENTADO', assessmentId: 'b', message: 'x' }],
+    } as never);
+
+    await expect(planService.listConflicts(USER_ID)).resolves.toEqual([]);
+  });
+
+  it('lista os avisos do plano que vale agora', async () => {
+    findActiveByUser.mockResolvedValue({
+      id: PLAN_ID,
+      conflicts: [conflitoGuardado('b', 40)],
+    } as never);
+
+    await expect(planService.listConflicts(USER_ID)).resolves.toEqual([
+      expect.objectContaining({ assessmentId: 'b', deficitMinutes: 40 }),
+    ]);
+  });
+
+  it('sem plano ativo não há aviso nenhum', async () => {
+    findActiveByUser.mockResolvedValue(null);
+
+    await expect(planService.listConflicts(USER_ID)).resolves.toEqual([]);
   });
 });

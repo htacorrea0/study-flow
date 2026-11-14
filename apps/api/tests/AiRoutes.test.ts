@@ -4,13 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // O serviço é mockado: o alvo aqui é o contrato HTTP (multipart, validação,
 // autenticação), não a conversa com o Gemini.
 vi.mock('../src/services/AiStudyPlanService', () => ({ chat: vi.fn() }));
+vi.mock('../src/services/AiPlanApplyService', () => ({ apply: vi.fn() }));
 
 import { createApp } from '../src/app';
 import { signAccessToken } from '../src/security/token';
+import * as aiPlanApplyService from '../src/services/AiPlanApplyService';
 import * as aiService from '../src/services/AiStudyPlanService';
 
 const app = createApp();
 const chat = vi.mocked(aiService.chat);
+const apply = vi.mocked(aiPlanApplyService.apply);
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -100,5 +103,93 @@ describe('POST /ai/study-plan/chat', () => {
 
     expect(res.status).toBe(401);
     expect(chat).not.toHaveBeenCalled();
+  });
+});
+
+const PLANO = {
+  title: 'Plano do semestre',
+  summary: 'Estratégia',
+  totalWeeklyMinutes: 300,
+  subjects: [
+    { name: 'Cálculo I', priority: 'ALTA', weeklyMinutes: 300, topics: ['Limites'], reason: '' },
+  ],
+  weeklySchedule: [],
+  tips: [],
+};
+
+const APLICADO = {
+  createdSubjects: ['Cálculo I'],
+  createdAssessments: 1,
+  createdContents: 1,
+  subjectsWithoutDeadline: [],
+  conflicts: [],
+};
+
+describe('POST /ai/study-plan/apply', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('devolve 201 e repassa plano e prazos ao serviço', async () => {
+    apply.mockResolvedValue(APLICADO);
+
+    const res = await request(app)
+      .post('/ai/study-plan/apply')
+      .set('Authorization', bearer())
+      .send({
+        plan: {
+          ...PLANO,
+          assessments: [
+            { subject: 'Cálculo I', title: 'P1', date: '2026-12-01', type: 'EXAM' },
+          ],
+        },
+        deadlines: [{ subject: 'Física', date: '2026-12-10' }],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual(APLICADO);
+    expect(apply.mock.calls[0]?.[1].plan.assessments).toEqual([
+      { subject: 'Cálculo I', title: 'P1', date: '2026-12-01', type: 'EXAM' },
+    ]);
+    expect(apply.mock.calls[0]?.[1].deadlines).toEqual([
+      { subject: 'Física', date: '2026-12-10' },
+    ]);
+  });
+
+  it('descarta avaliação malformada sem recusar o plano', async () => {
+    apply.mockResolvedValue(APLICADO);
+
+    const res = await request(app)
+      .post('/ai/study-plan/apply')
+      .set('Authorization', bearer())
+      .send({
+        plan: {
+          ...PLANO,
+          assessments: [
+            { subject: 'Cálculo I', title: 'P1', date: '30/12/2026', type: 'EXAM' },
+            { subject: 'Cálculo I', title: 'P2', date: '2026-12-05', type: 'EXAM' },
+          ],
+        },
+      });
+
+    expect(res.status).toBe(201);
+    expect(apply.mock.calls[0]?.[1].plan.assessments).toEqual([
+      { subject: 'Cálculo I', title: 'P2', date: '2026-12-05', type: 'EXAM' },
+    ]);
+  });
+
+  it('devolve 422 sem título de plano e não chega ao serviço', async () => {
+    const res = await request(app)
+      .post('/ai/study-plan/apply')
+      .set('Authorization', bearer())
+      .send({ plan: { ...PLANO, title: '' } });
+
+    expect(res.status).toBe(422);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it('devolve 401 sem Bearer e não chega ao serviço', async () => {
+    const res = await request(app).post('/ai/study-plan/apply').send({ plan: PLANO });
+
+    expect(res.status).toBe(401);
+    expect(apply).not.toHaveBeenCalled();
   });
 });

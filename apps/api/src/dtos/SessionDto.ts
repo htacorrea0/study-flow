@@ -10,6 +10,17 @@ import {
 } from '../services/support/studyDates';
 
 /**
+ * A passada em palavras.
+ *
+ * A primeira vez é leitura, as seguintes são revisão, e a interface mostra
+ * isso ao lado do título: "Revisar logaritmos" sozinho não diz se é a
+ * primeira ou a terceira volta no mesmo assunto.
+ */
+export function rotuloDaPassada(passIndex: number): string {
+  return passIndex === 0 ? '1ª leitura' : `${passIndex}ª revisão`;
+}
+
+/**
  * Converte uma atividade do plano no item que as duas telas desenham.
  *
  * O prazo vira um número de dias em vez de uma data porque é isso que a
@@ -36,6 +47,8 @@ export function toSessionItem(
     daysUntilDue: daysBetween(today, toIsoDateInTimezone(assessment.dueAt, timezone)),
     estimatedMinutes: activity.estimatedMinutes,
     status: activity.status,
+    passIndex: activity.passIndex,
+    passLabel: rotuloDaPassada(activity.passIndex),
     scheduledDate: fromDateColumn(activity.scheduledDate),
   };
 }

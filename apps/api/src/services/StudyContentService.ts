@@ -5,7 +5,6 @@ import type {
 } from '@study-flow/shared';
 
 import { toAssessmentResponse } from '../dtos/AssessmentDto';
-import { toPlanConflicts } from '../dtos/PlanDto';
 import { NotFoundError } from '../errors/HttpErrors';
 import * as assessmentModel from '../models/AssessmentModel';
 import * as studyContentModel from '../models/StudyContentModel';
@@ -31,7 +30,7 @@ async function responder(
   assessmentId: string,
   now: Date,
 ): Promise<AssessmentMutationResponse> {
-  const resultado = await planService.recalculate(userId, { kind: 'assessment', assessmentId }, now);
+  await planService.recalculate(userId, now);
 
   const avaliacao = await assessmentModel.findByIdForUser(userId, assessmentId);
   if (avaliacao === null) {
@@ -40,7 +39,7 @@ async function responder(
 
   return {
     assessment: toAssessmentResponse(avaliacao),
-    conflicts: toPlanConflicts(resultado),
+    conflicts: await planService.listConflicts(userId),
   };
 }
 

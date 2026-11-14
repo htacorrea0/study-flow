@@ -9,6 +9,7 @@ import { calendarRoutes } from './CalendarRoutes';
 import { contentRoutes } from './ContentRoutes';
 import { dashboardRoutes } from './DashboardRoutes';
 import { healthRoutes } from './HealthRoutes';
+import { planRoutes } from './PlanRoutes';
 import { subjectRoutes } from './SubjectRoutes';
 
 /**
@@ -31,5 +32,6 @@ routes.use('/subjects', subjectRoutes);
 routes.use('/assessments', assessmentRoutes);
 routes.use('/contents', contentRoutes);
 routes.use('/availability', availabilityRoutes);
+routes.use('/plan', planRoutes);
 routes.use('/activities', activityRoutes);
 routes.use('/ai', aiRoutes);

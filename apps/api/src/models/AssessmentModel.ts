@@ -1,4 +1,4 @@
-import { prisma } from '../config/prisma';
+import { clientOrTransaction, prisma, type TransactionClient } from '../config/prisma';
 import type { AssessmentType, Prisma, StudyDepth } from '../generated/prisma/client';
 
 /**
@@ -138,8 +138,9 @@ export async function create(
     priority?: number;
     depth?: StudyDepth;
   }[],
+  tx?: TransactionClient,
 ): Promise<AssessmentDetailRow> {
-  return prisma.assessment.create({
+  return clientOrTransaction(tx).assessment.create({
     data: {
       userId,
       ...data,

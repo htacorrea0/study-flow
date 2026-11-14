@@ -292,6 +292,7 @@ describe('CalendarService.getDay', () => {
         scheduledDate: new Date('2026-10-20T00:00:00.000Z'),
         estimatedMinutes: 60,
         status: 'IN_PROGRESS',
+        passIndex: 1,
         position: 0,
         content: {
           title: 'Lista de exercícios',
@@ -317,6 +318,8 @@ describe('CalendarService.getDay', () => {
         daysUntilDue: 10,
         estimatedMinutes: 60,
         status: 'IN_PROGRESS',
+        passIndex: 1,
+        passLabel: '1ª revisão',
         scheduledDate: '2026-10-20',
       },
     ]);

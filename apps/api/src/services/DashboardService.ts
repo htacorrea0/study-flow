@@ -96,7 +96,7 @@ async function resolveDoneMinutes(
 
   const [minutesFromProgress, secondsFromTimer] = await Promise.all([
     studyProgressModel.sumMinutesSpentInRange(userId, start, end),
-    studyTimeEntryModel.sumSecondsInRange(userId, start, end),
+    studyTimeEntryModel.sumSecondsInRangeWithoutActivity(userId, start, end),
   ]);
 
   const minutesFromTimer = Math.round(secondsFromTimer / 60);

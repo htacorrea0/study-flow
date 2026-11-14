@@ -23,6 +23,10 @@ vi.mock('../src/models/AvailabilityModel', () => ({
   findAvailabilityByWeekday: vi.fn(),
   findExceptionByDate: vi.fn(),
 }));
+vi.mock('../src/models/StudyTimeEntryModel', () => ({
+  sumSecondsInRangeWithoutActivity: vi.fn(),
+  findRecordedTimestampsSince: vi.fn(),
+}));
 
 import { UnauthorizedError } from '../src/errors/HttpErrors';
 import * as availabilityModel from '../src/models/AvailabilityModel';
@@ -30,6 +34,7 @@ import type { ActivityWithContext } from '../src/models/StudyActivityModel';
 import * as studyActivityModel from '../src/models/StudyActivityModel';
 import * as studyPlanModel from '../src/models/StudyPlanModel';
 import * as studyProgressModel from '../src/models/StudyProgressModel';
+import * as studyTimeEntryModel from '../src/models/StudyTimeEntryModel';
 import * as userModel from '../src/models/UserModel';
 import * as dashboardService from '../src/services/DashboardService';
 
@@ -40,6 +45,8 @@ const sumMinutesSpentInRange = vi.mocked(studyProgressModel.sumMinutesSpentInRan
 const findDoneTimestampsSince = vi.mocked(studyProgressModel.findDoneTimestampsSince);
 const findAvailabilityByWeekday = vi.mocked(availabilityModel.findAvailabilityByWeekday);
 const findExceptionByDate = vi.mocked(availabilityModel.findExceptionByDate);
+const sumSecondsSemSessao = vi.mocked(studyTimeEntryModel.sumSecondsInRangeWithoutActivity);
+const findRecordedTimestampsSince = vi.mocked(studyTimeEntryModel.findRecordedTimestampsSince);
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const PLAN_ID = '22222222-2222-4222-8222-222222222222';
@@ -79,6 +86,7 @@ function activity(overrides: Partial<ActivityWithContext> = {}): ActivityWithCon
     scheduledDate: new Date('2026-10-16T00:00:00.000Z'),
     estimatedMinutes: 45,
     status: 'PLANNED',
+    passIndex: 0,
     position: 0,
     content: {
       title: 'Thévenin',
@@ -106,6 +114,8 @@ describe('DashboardService.getDashboard', () => {
     findUpcomingByUser.mockResolvedValue([]);
     sumMinutesSpentInRange.mockResolvedValue(0);
     findDoneTimestampsSince.mockResolvedValue([]);
+    sumSecondsSemSessao.mockResolvedValue(0);
+    findRecordedTimestampsSince.mockResolvedValue([]);
     semDisponibilidade();
   });
 
@@ -171,6 +181,28 @@ describe('DashboardService.getDashboard', () => {
     expect(findAvailabilityByWeekday).not.toHaveBeenCalled();
   });
 
+  it('soma o cronômetro solto à meta do dia', async () => {
+    findAvailabilityByWeekday.mockResolvedValue({ minutes: 120 } as never);
+    sumMinutesSpentInRange.mockResolvedValue(40);
+    sumSecondsSemSessao.mockResolvedValue(30 * 60);
+
+    const res = await dashboardService.getDashboard(USER_ID, AGORA);
+
+    expect(res.todayGoal.doneMinutes).toBe(70);
+  });
+
+  it('não conta duas vezes o tempo que o cronômetro creditou a uma sessão', async () => {
+    findAvailabilityByWeekday.mockResolvedValue({ minutes: 120 } as never);
+    // A sessão de 50 minutos chega pelo progresso; o bloco de cronômetro que a
+    // creditou fica de fora da soma de tempo solto, e por isso vale 50, não 100.
+    sumMinutesSpentInRange.mockResolvedValue(50);
+    sumSecondsSemSessao.mockResolvedValue(0);
+
+    const res = await dashboardService.getDashboard(USER_ID, AGORA);
+
+    expect(res.todayGoal.doneMinutes).toBe(50);
+  });
+
   it('conta a sequência em dias civis do fuso da pessoa', async () => {
     findDoneTimestampsSince.mockResolvedValue([
       // 2026-10-15 em São Paulo, já 16 em UTC: o fuso precisa ser aplicado.
@@ -221,6 +253,8 @@ describe('DashboardService.getDashboard', () => {
         daysUntilDue: 3,
         estimatedMinutes: 45,
         status: 'PLANNED',
+        passIndex: 0,
+        passLabel: '1ª leitura',
         scheduledDate: '2026-10-16',
       },
     ]);

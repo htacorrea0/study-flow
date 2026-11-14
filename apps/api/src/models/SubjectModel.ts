@@ -1,4 +1,4 @@
-import { prisma } from '../config/prisma';
+import { clientOrTransaction, prisma, type TransactionClient } from '../config/prisma';
 import type { Prisma, Subject } from '../generated/prisma/client';
 
 /**
@@ -34,8 +34,12 @@ export async function findByIdForUser(
 export async function create(
   userId: string,
   data: { name: string; color: string | null },
+  tx?: TransactionClient,
 ): Promise<SubjectWithCount> {
-  return prisma.subject.create({ data: { userId, ...data }, include: COM_CONTAGEM });
+  return clientOrTransaction(tx).subject.create({
+    data: { userId, ...data },
+    include: COM_CONTAGEM,
+  });
 }
 
 /**

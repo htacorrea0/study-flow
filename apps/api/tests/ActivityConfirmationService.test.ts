@@ -15,7 +15,10 @@ vi.mock('../src/models/StudyProgressModel', () => ({
   createMany: vi.fn(),
 }));
 vi.mock('../src/services/CalendarService', () => ({ getDay: vi.fn(), getMonth: vi.fn() }));
-vi.mock('../src/services/PlanService', () => ({ recalculate: vi.fn() }));
+vi.mock('../src/services/PlanService', () => ({
+  recalculate: vi.fn(),
+  listConflicts: vi.fn(),
+}));
 
 import * as studyActivityModel from '../src/models/StudyActivityModel';
 import * as studyPlanModel from '../src/models/StudyPlanModel';
@@ -33,6 +36,7 @@ const deleteProgress = vi.mocked(studyProgressModel.deleteForContentsInDay);
 const createProgress = vi.mocked(studyProgressModel.createMany);
 const getDay = vi.mocked(CalendarService.getDay);
 const recalculate = vi.mocked(planService.recalculate);
+const listConflicts = vi.mocked(planService.listConflicts);
 
 const USER = 'user-1';
 const PLANO = 'plano-ativo';
@@ -61,6 +65,7 @@ const DIA_VAZIO = { date: HOJE, assessments: [], sessions: [] };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  listConflicts.mockResolvedValue([]);
   findUser.mockResolvedValue({
     id: USER,
     timezone: 'America/Sao_Paulo',
@@ -178,7 +183,7 @@ describe('ActivityConfirmationService.confirm', () => {
     expect(resposta.recalculated).toBe(false);
   });
 
-  it('recalcula uma vez por avaliação afetada, e só pelas que foram puladas', async () => {
+  it('recalcula o plano inteiro uma vez só, mesmo com várias avaliações puladas', async () => {
     findActivities.mockResolvedValue([
       atividade('a1', 'c1', 'av1'),
       atividade('a2', 'c2', 'av1'),
@@ -200,12 +205,8 @@ describe('ActivityConfirmationService.confirm', () => {
       AGORA,
     );
 
-    expect(recalculate).toHaveBeenCalledTimes(2);
-    const escopos = recalculate.mock.calls.map((chamada) => chamada[1]);
-    expect(escopos).toEqual([
-      { kind: 'assessment', assessmentId: 'av1' },
-      { kind: 'assessment', assessmentId: 'av2' },
-    ]);
+    expect(recalculate).toHaveBeenCalledTimes(1);
+    expect(recalculate).toHaveBeenCalledWith(USER, expect.any(Date));
     expect(resposta.recalculated).toBe(true);
   });
 
@@ -218,7 +219,7 @@ describe('ActivityConfirmationService.confirm', () => {
       AGORA,
     );
 
-    expect(recalculate.mock.calls[0]?.[2]).toEqual(new Date('2026-11-03T03:00:00.000Z'));
+    expect(recalculate.mock.calls[0]?.[1]).toEqual(new Date('2026-11-03T03:00:00.000Z'));
   });
 
   it('confirmando um dia passado, a redistribuição continua partindo de hoje', async () => {
@@ -230,7 +231,7 @@ describe('ActivityConfirmationService.confirm', () => {
       AGORA,
     );
 
-    expect(recalculate.mock.calls[0]?.[2]).toEqual(AGORA);
+    expect(recalculate.mock.calls[0]?.[1]).toEqual(AGORA);
   });
 
   it('recusa quando algum identificador não é do usuário', async () => {

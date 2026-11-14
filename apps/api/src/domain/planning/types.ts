@@ -89,11 +89,21 @@ export interface PlannedActivity {
   readonly estimatedMinutes: number;
   /** Ordem dentro do dia, começando em 0. */
   readonly position: number;
+  /**
+   * Qual passada do conteúdo esta atividade é, contando desde a primeira de
+   * todas: 0 é a leitura inicial, 1 a primeira revisão. Conta as passadas já
+   * feitas, então um conteúdo que volta para a fila nunca repete um índice
+   * que já foi agendado — é o que mantém a sugestão de material diferente a
+   * cada dia em que o conteúdo reaparece.
+   */
+  readonly passIndex: number;
 }
 
 /** Natureza de um problema detectado durante o planejamento. */
 export type PlanningConflictKind =
-  /** O tempo disponível até a avaliação não cobre o esforço estimado. */
+  /** Coube, mas com os tempos reduzidos na proporção da intensidade pedida. */
+  | 'COMPRESSED_PLAN'
+  /** Nem no tempo mínimo por sessão o esforço cabe até o prazo. */
   | 'INSUFFICIENT_TIME'
   /** Não há nenhum dia de estudo disponível antes da avaliação. */
   | 'NO_AVAILABLE_DAY'
@@ -113,6 +123,8 @@ export interface PlanningConflict {
   readonly message: string;
   /** Quantos minutos faltam, quando `kind` é `INSUFFICIENT_TIME`. */
   readonly deficitMinutes?: number;
+  /** Quanto do tempo pedido sobrou, de 0 a 100, em `COMPRESSED_PLAN`. */
+  readonly compressionPercent?: number;
 }
 
 /** Resultado do planejamento. */

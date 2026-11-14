@@ -7,6 +7,10 @@ import type { ActivityStatus } from '../generated/prisma/client';
  *
  * O intervalo é semiaberto: `[start, end)`. `minutesSpent` é opcional no
  * schema, então registros sem tempo informado entram como zero na soma.
+ *
+ * `IN_PROGRESS` entra junto com `DONE`: é o que o cronômetro grava quando a
+ * pessoa estudou parte de uma sessão e ainda não cobriu o previsto. Deixar
+ * esse registro de fora faria meia hora de estudo real sumir da meta do dia.
  */
 export async function sumMinutesSpentInRange(
   userId: string,
@@ -14,7 +18,11 @@ export async function sumMinutesSpentInRange(
   end: Date,
 ): Promise<number> {
   const resultado = await prisma.studyProgress.aggregate({
-    where: { userId, status: 'DONE', recordedAt: { gte: start, lt: end } },
+    where: {
+      userId,
+      status: { in: ['DONE', 'IN_PROGRESS'] },
+      recordedAt: { gte: start, lt: end },
+    },
     _sum: { minutesSpent: true },
   });
 
@@ -48,32 +56,6 @@ export async function findDoneTimestampsSince(
   });
 
   return registros.map((registro) => registro.recordedAt);
-}
-
-/**
- * Quantas passadas de cada conteúdo a pessoa já concluiu.
- *
- * É o que o planejamento recebe como `completedPassesByContentId`. A
- * contagem, e não uma lista de concluídos, porque a profundidade da matéria
- * manda o conteúdo voltar mais de uma vez: quem fez uma das três passadas de
- * um conteúdo intenso ainda tem duas pela frente.
- *
- * Contar registros só é confiável porque reconfirmar um dia substitui o
- * progresso daquele conteúdo naquela data em vez de empilhar um segundo. O
- * registro aponta para o conteúdo, não para a atividade, e é por isso que ele
- * sobrevive a um plano aposentado.
- */
-export async function findDonePassCountByContent(
-  userId: string,
-  tx?: TransactionClient,
-): Promise<Readonly<Record<string, number>>> {
-  const grupos = await clientOrTransaction(tx).studyProgress.groupBy({
-    by: ['contentId'],
-    where: { userId, status: 'DONE' },
-    _count: { _all: true },
-  });
-
-  return Object.fromEntries(grupos.map((grupo) => [grupo.contentId, grupo._count._all]));
 }
 
 /**

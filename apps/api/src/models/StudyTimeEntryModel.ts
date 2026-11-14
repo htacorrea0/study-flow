@@ -4,6 +4,7 @@ import type { StudyTimeSource } from '../generated/prisma/client';
 
 export interface StudyTimeEntryCreateInput {
   readonly subjectId?: string;
+  readonly activityId?: string;
   readonly source: StudyTimeSource;
   readonly seconds: number;
   readonly recordedAt: Date;
@@ -19,6 +20,7 @@ export async function create(
     data: {
       userId,
       subjectId: input.subjectId,
+      activityId: input.activityId,
       source: input.source,
       seconds: input.seconds,
       recordedAt: input.recordedAt,
@@ -34,6 +36,46 @@ export async function sumSecondsInRange(
 ): Promise<number> {
   const resultado = await prisma.studyTimeEntry.aggregate({
     where: { userId, recordedAt: { gte: start, lt: end } },
+    _sum: { seconds: true },
+  });
+
+  return resultado._sum.seconds ?? 0;
+}
+
+/**
+ * Como `sumSecondsInRange`, mas só do tempo que não credita sessão nenhuma.
+ *
+ * É o que a meta do dia soma. O tempo creditado a uma sessão já chega ao
+ * dashboard como `minutesSpent` do `StudyProgress`; contá-lo aqui também
+ * faria o mesmo estudo valer o dobro.
+ */
+export async function sumSecondsInRangeWithoutActivity(
+  userId: string,
+  start: Date,
+  end: Date,
+): Promise<number> {
+  const resultado = await prisma.studyTimeEntry.aggregate({
+    where: { userId, activityId: null, recordedAt: { gte: start, lt: end } },
+    _sum: { seconds: true },
+  });
+
+  return resultado._sum.seconds ?? 0;
+}
+
+/**
+ * Tempo total já cronometrado para uma sessão, somando todos os dias.
+ *
+ * A soma não se limita ao dia da sessão: quem recupera no sábado a sessão de
+ * quinta estudou aquele conteúdo, e o tempo precisa somar para a sessão
+ * fechar.
+ */
+export async function sumSecondsForActivity(
+  userId: string,
+  activityId: string,
+  tx?: TransactionClient,
+): Promise<number> {
+  const resultado = await clientOrTransaction(tx).studyTimeEntry.aggregate({
+    where: { userId, activityId },
     _sum: { seconds: true },
   });
 

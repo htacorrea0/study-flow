@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ESFORCO_PADRAO_MINUTOS,
+  MINIMO_POR_SESSAO,
   PASSADAS_POR_PROFUNDIDADE,
   deadlineFirstPlanner,
 } from '../src/domain/planning/deadlineFirstPlanner';
@@ -10,6 +11,7 @@ import type {
   PlanningAssessment,
   PlanningContent,
   PlanningInput,
+  PlanningOutput,
 } from '../src/domain/planning/types';
 
 const HOJE = '2026-11-02';
@@ -54,10 +56,19 @@ function entrada(parcial: Partial<PlanningInput>): PlanningInput {
   };
 }
 
+/** Quantos minutos cada conteúdo recebeu no total, somando as passadas. */
+function minutosPorConteudo(saida: PlanningOutput): Record<string, number> {
+  const total: Record<string, number> = {};
+  for (const atividade of saida.activities) {
+    total[atividade.contentId] = (total[atividade.contentId] ?? 0) + atividade.estimatedMinutes;
+  }
+  return total;
+}
+
 describe('deadlineFirstPlanner', () => {
   it('grava a versão da heurística na saída', () => {
-    expect(deadlineFirstPlanner.version).toBe('deadline-first-v1');
-    expect(deadlineFirstPlanner.plan(entrada({})).algorithmVersion).toBe('deadline-first-v1');
+    expect(deadlineFirstPlanner.version).toBe('deadline-first-v2');
+    expect(deadlineFirstPlanner.plan(entrada({})).algorithmVersion).toBe('deadline-first-v2');
   });
 
   it('espalha os conteúdos em vez de amontoá-los no primeiro dia', () => {
@@ -136,26 +147,126 @@ describe('deadlineFirstPlanner', () => {
     expect(saida.activities[0]?.estimatedMinutes).toBe(ESFORCO_PADRAO_MINUTOS);
   });
 
-  it('encaixa e avisa quando não cabe no tempo livre', () => {
+  it('encolhe na proporção, em vez de agendar tempo que não existe', () => {
     const saida = deadlineFirstPlanner.plan(
       entrada({
         assessments: [avaliacao({ id: 'a', title: 'Prova de Cálculo', dueDate: '2026-11-03' })],
-        // 360 minutos de conteúdo para 120 minutos livres: faltam 240.
+        // 150 minutos pedidos para 60 livres: o dobro continua sendo o dobro.
         contents: [
-          conteudo({ id: 'c1', estimatedEffortMinutes: 180 }),
-          conteudo({ id: 'c2', estimatedEffortMinutes: 180 }),
+          conteudo({ id: 'x', estimatedEffortMinutes: 100 }),
+          conteudo({ id: 'y', estimatedEffortMinutes: 50 }),
         ],
-        capacities: dias(['2026-11-02', '2026-11-03'], 60),
+        capacities: dias(['2026-11-02', '2026-11-03'], 30),
       }),
     );
 
-    expect(saida.activities).toHaveLength(2);
+    expect(minutosPorConteudo(saida)).toEqual({ x: 40, y: 20 });
+    expect(saida.unscheduledContentIds).toEqual([]);
+    expect(saida.conflicts).toHaveLength(1);
+    expect(saida.conflicts[0]?.kind).toBe('COMPRESSED_PLAN');
+    expect(saida.conflicts[0]?.assessmentId).toBe('a');
+    expect(saida.conflicts[0]?.compressionPercent).toBe(40);
+    expect(saida.conflicts[0]?.message).toContain('Prova de Cálculo');
+  });
+
+  it('a prova que entra depois reaperta as outras, mantendo a intensidade', () => {
+    const antes = deadlineFirstPlanner.plan(
+      entrada({
+        assessments: [avaliacao({ id: 'a', dueDate: '2026-11-03' })],
+        contents: [
+          conteudo({ id: 'x', estimatedEffortMinutes: 100 }),
+          conteudo({ id: 'y', estimatedEffortMinutes: 50 }),
+        ],
+        capacities: dias(['2026-11-02', '2026-11-03'], 30),
+      }),
+    );
+
+    const depois = deadlineFirstPlanner.plan(
+      entrada({
+        assessments: [
+          avaliacao({ id: 'a', dueDate: '2026-11-03' }),
+          avaliacao({ id: 'b', dueDate: '2026-11-03' }),
+        ],
+        contents: [
+          conteudo({ id: 'x', estimatedEffortMinutes: 100 }),
+          conteudo({ id: 'y', estimatedEffortMinutes: 50 }),
+          conteudo({ id: 'z', assessmentId: 'b', estimatedEffortMinutes: 30 }),
+        ],
+        capacities: dias(['2026-11-02', '2026-11-03'], 30),
+      }),
+    );
+
+    expect(minutosPorConteudo(antes)).toEqual({ x: 40, y: 20 });
+    // Os minutos de x e y mudam sozinhos para abrir espaço para z.
+    expect(minutosPorConteudo(depois)).toEqual({ x: 33, y: 17, z: 10 });
+    expect(depois.conflicts.map((aviso) => aviso.kind)).toEqual([
+      'COMPRESSED_PLAN',
+      'COMPRESSED_PLAN',
+    ]);
+  });
+
+  it('avisa do déficit quando nem o ritmo mínimo cabe', () => {
+    const saida = deadlineFirstPlanner.plan(
+      entrada({
+        assessments: [avaliacao({ id: 'a', title: 'Prova de Cálculo', dueDate: '2026-11-02' })],
+        // Dez conteúdos no piso de 10 minutos pedem 100; o dia tem 60.
+        contents: Array.from({ length: 10 }, (_, indice) =>
+          conteudo({ id: `c${indice}`, estimatedEffortMinutes: 60 }),
+        ),
+        capacities: dias(['2026-11-02'], 60),
+      }),
+    );
+
+    expect(saida.activities).toHaveLength(10);
+    expect(saida.activities.every((a) => a.estimatedMinutes === MINIMO_POR_SESSAO)).toBe(true);
     expect(saida.unscheduledContentIds).toEqual([]);
     expect(saida.conflicts).toHaveLength(1);
     expect(saida.conflicts[0]?.kind).toBe('INSUFFICIENT_TIME');
-    expect(saida.conflicts[0]?.assessmentId).toBe('a');
-    expect(saida.conflicts[0]?.deficitMinutes).toBe(240);
+    expect(saida.conflicts[0]?.deficitMinutes).toBe(40);
     expect(saida.conflicts[0]?.message).toContain('Prova de Cálculo');
+  });
+
+  it('foca na prova de prazo curto e adianta de leve a distante', () => {
+    const saida = deadlineFirstPlanner.plan(
+      entrada({
+        assessments: [
+          avaliacao({ id: 'perto', dueDate: '2026-11-08' }),
+          avaliacao({ id: 'longe', dueDate: '2026-11-16' }),
+        ],
+        contents: [
+          ...Array.from({ length: 4 }, (_, indice) =>
+            conteudo({ id: `perto-${indice}`, assessmentId: 'perto', estimatedEffortMinutes: 30 }),
+          ),
+          ...Array.from({ length: 10 }, (_, indice) =>
+            conteudo({ id: `longe-${indice}`, assessmentId: 'longe', estimatedEffortMinutes: 20 }),
+          ),
+        ],
+        capacities: dias(
+          Array.from({ length: 15 }, (_, indice) => `2026-11-${String(indice + 2).padStart(2, '0')}`),
+          60,
+        ),
+      }),
+    );
+
+    expect(saida.conflicts).toEqual([]);
+
+    const primeiroDia = saida.activities.filter((a) => a.date === '2026-11-02');
+    const minutosDe = (prefixo: string, lista: typeof primeiroDia): number =>
+      lista
+        .filter((a) => a.contentId.startsWith(prefixo))
+        .reduce((soma, a) => soma + a.estimatedMinutes, 0);
+
+    // A distante já aparece no primeiro dia, mas com menos tempo do que a próxima.
+    expect(minutosDe('longe', primeiroDia)).toBeGreaterThan(0);
+    expect(minutosDe('perto', primeiroDia)).toBeGreaterThan(minutosDe('longe', primeiroDia));
+
+    // Nada da prova próxima cai depois do prazo dela, e o que vem depois é só da distante.
+    const daPerto = saida.activities.filter((a) => a.contentId.startsWith('perto'));
+    expect(daPerto).toHaveLength(4);
+    expect(daPerto.every((a) => a.date <= '2026-11-08')).toBe(true);
+    expect(
+      saida.activities.filter((a) => a.date > '2026-11-08').every((a) => a.contentId.startsWith('longe')),
+    ).toBe(true);
   });
 
   it('não agenda nada quando o prazo já passou', () => {

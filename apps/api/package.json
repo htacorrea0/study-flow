@@ -17,6 +17,7 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "tsx prisma/seed.ts",
     "gemini:check": "node scripts/gemini-check.mjs",
+    "check:busca": "tsx scripts/verificar-busca.ts",
     "postinstall": "prisma generate",
     "test:int": "node scripts/setup-test-db.mjs && vitest run --config vitest.integration.config.mts"
   },

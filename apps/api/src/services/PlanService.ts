@@ -1,3 +1,5 @@
+import type { PlanConflict } from '@study-flow/shared';
+
 import { prisma } from '../config/prisma';
 import type { TransactionClient } from '../config/prisma';
 import { deadlineFirstPlanner } from '../domain/planning/deadlineFirstPlanner';
@@ -6,12 +8,12 @@ import type {
   PlanningContent,
   PlanningOutput,
 } from '../domain/planning/types';
+import { toPlanConflicts, toStoredPlanConflicts } from '../dtos/PlanDto';
 import { UnauthorizedError } from '../errors/HttpErrors';
 import * as assessmentModel from '../models/AssessmentModel';
 import * as availabilityModel from '../models/AvailabilityModel';
 import * as studyActivityModel from '../models/StudyActivityModel';
 import * as studyPlanModel from '../models/StudyPlanModel';
-import * as studyProgressModel from '../models/StudyProgressModel';
 import * as userModel from '../models/UserModel';
 import { buildCapacities, subtractOccupied } from './support/capacity';
 import {
@@ -31,26 +33,22 @@ import {
  * sobrevive porque ele é registrado contra o conteúdo, não contra a
  * atividade.
  *
- * O escopo é a decisão central daqui. Marcar "não estudei" numa sessão de
- * Cálculo não pode embaralhar as sessões de Direito: seria assustador abrir o
- * calendário e encontrar tudo em outro lugar. Então o recálculo escopado:
+ * O recálculo é sempre do plano inteiro, e isso é a decisão central daqui. O
+ * distribuidor comprime os tempos na proporção da intensidade pedida, e essa
+ * conta é sobre todas as avaliações pendentes ao mesmo tempo: incluir uma
+ * prova nova reaperta as que já existiam, apagar uma folga as outras. Refazer
+ * só um pedaço produziria um cronograma que contradiz a própria conta.
  *
- * - **copia** para o plano novo as atividades das outras avaliações, nas
- *   mesmas datas, posições e status;
- * - **copia** também tudo que está no passado, de qualquer avaliação, porque
- *   o calendário mostra os dias já vividos e apagá-los seria reescrever a
- *   história;
- * - **desconta** da capacidade de cada dia os minutos dessas cópias;
- * - chama o distribuidor só com os conteúdos da avaliação afetada.
+ * Dia passado conta como estudado enquanto a pessoa não disser o contrário.
+ * Ela marca "não estudei" em qualquer dia anterior a hoje, e só então o
+ * conteúdo volta para a fila — ver `contarPassadasPresumidas`.
  *
- * Assim a interface do distribuidor continua a mesma: ele recebe "dias
- * disponíveis" e não sabe que parte do dia já estava ocupada.
+ * O que não é redistribuído é o passado: as atividades de dias já vividos são
+ * **copiadas** para o plano novo, nas mesmas datas, posições e status, porque
+ * o calendário mostra o que já aconteceu e apagá-lo seria reescrever a
+ * história. Os minutos dessas cópias são descontados da capacidade, então o
+ * distribuidor continua recebendo só "dias disponíveis".
  */
-
-/** O que recalcular. `all` refaz tudo, usado quando a disponibilidade muda. */
-export type RecalculationScope =
-  | { readonly kind: 'assessment'; readonly assessmentId: string }
-  | { readonly kind: 'all' };
 
 /** Plano vazio, devolvido quando não há nada pendente a distribuir. */
 const SEM_PLANO: PlanningOutput = {
@@ -66,6 +64,7 @@ interface AtividadeParaGravar {
   readonly scheduledDate: Date;
   readonly estimatedMinutes: number;
   readonly position: number;
+  readonly passIndex: number;
   readonly status?: 'PLANNED' | 'IN_PROGRESS' | 'DONE' | 'SKIPPED';
   readonly manuallyEdited?: boolean;
 }
@@ -77,11 +76,7 @@ interface AtividadeParaGravar {
  * resultado reproduzível num teste e o que evita que o relógio do servidor
  * decida qual é o dia da pessoa.
  */
-export async function recalculate(
-  userId: string,
-  scope: RecalculationScope,
-  now: Date,
-): Promise<PlanningOutput> {
+export async function recalculate(userId: string, now: Date): Promise<PlanningOutput> {
   const user = await userModel.findById(userId);
   if (user === null) {
     throw new UnauthorizedError('Sessão inválida. Entre novamente.');
@@ -116,13 +111,10 @@ export async function recalculate(
     atual > maior ? atual : maior,
   );
 
-  const copiadas = selecionarCopias(atividadesAtuais, scope, hoje, prazoPorAvaliacao);
+  const copiadas = selecionarCopias(atividadesAtuais, hoje);
   const capacidades = await montarCapacidades(userId, hoje, horizonEnd, copiadas);
 
-  const afetadas = avaliacoes.filter(
-    (avaliacao) => scope.kind === 'all' || avaliacao.id === scope.assessmentId,
-  );
-  const passadasFeitas = await studyProgressModel.findDonePassCountByContent(userId);
+  const passadasFeitas = contarPassadasPresumidas(copiadas);
 
   const resultado = deadlineFirstPlanner.plan({
     referenceDate: hoje,
@@ -137,7 +129,7 @@ export async function recalculate(
         dueDate: prazoPorAvaliacao.get(avaliacao.id) as IsoDate,
       }),
     ),
-    contents: afetadas.flatMap((avaliacao) =>
+    contents: avaliacoes.flatMap((avaliacao) =>
       avaliacao.contents.map(
         (conteudo): PlanningContent => ({
           id: conteudo.id,
@@ -154,6 +146,7 @@ export async function recalculate(
   });
 
   const paraGravar = juntar(copiadas, resultado);
+  const conflitos = toPlanConflicts(resultado);
 
   await prisma.$transaction(async (tx: TransactionClient) => {
     await studyPlanModel.supersedeActive(userId, tx);
@@ -163,6 +156,7 @@ export async function recalculate(
         algorithmVersion: resultado.algorithmVersion,
         horizonStart: toDateColumn(hoje),
         horizonEnd: toDateColumn(horizonEnd),
+        conflicts: conflitos,
       },
       tx,
     );
@@ -172,40 +166,66 @@ export async function recalculate(
   return resultado;
 }
 
+/** Os avisos do plano que vale agora. Sem plano ativo, nenhum aviso. */
+export async function listConflicts(userId: string): Promise<readonly PlanConflict[]> {
+  const plano = await studyPlanModel.findActiveByUser(userId);
+
+  return plano === null ? [] : toStoredPlanConflicts(plano.conflicts);
+}
+
 /**
  * Quais atividades do plano atual seguem para o plano novo.
  *
- * Duas famílias passam: o que está no passado (de qualquer avaliação) e o que
- * é de uma avaliação que este recálculo não deve tocar. Atividade de
- * avaliação que não está mais pendente, apagada ou com prazo vencido, fica
- * para trás no plano aposentado.
+ * Só o passado, de qualquer avaliação: o calendário mostra os dias já
+ * vividos e apagá-los seria reescrever a história. De hoje em diante tudo é
+ * redistribuído, porque a compressão é uma conta sobre todas as avaliações
+ * juntas e manter uma sessão parada no lugar antigo quebraria a conta.
  */
 function selecionarCopias(
   atividades: readonly studyActivityModel.ActivityForCopy[],
-  scope: RecalculationScope,
   hoje: IsoDate,
-  prazoPorAvaliacao: ReadonlyMap<string, IsoDate>,
 ): readonly AtividadeParaGravar[] {
   return atividades
-    .filter((atividade) => {
-      const data = fromDateColumn(atividade.scheduledDate);
-      if (data < hoje) {
-        return true;
-      }
-      if (!prazoPorAvaliacao.has(atividade.content.assessmentId)) {
-        return false;
-      }
-      return scope.kind === 'assessment' && atividade.content.assessmentId !== scope.assessmentId;
-    })
+    .filter((atividade) => fromDateColumn(atividade.scheduledDate) < hoje)
     .map((atividade) => ({
       contentId: atividade.contentId,
       title: atividade.title,
       scheduledDate: atividade.scheduledDate,
       estimatedMinutes: atividade.estimatedMinutes,
       position: atividade.position,
+      passIndex: atividade.passIndex,
       status: atividade.status,
       manuallyEdited: atividade.manuallyEdited,
     }));
+}
+
+/**
+ * Quantas passadas de cada conteúdo já valem como feitas.
+ *
+ * A regra é a presunção de estudo: **dia que passou sem a pessoa dizer nada
+ * conta como estudado**. Quem não abre o app no fim do dia não está pedindo
+ * para o cronograma inteiro ser reapertado; quem quer reapertar diz que não
+ * estudou, e aí a sessão fica `SKIPPED` e volta para a fila.
+ *
+ * Por isso a conta é sobre as atividades passadas, e não sobre
+ * `StudyProgress`: o progresso é registro factual, só tem o que a pessoa
+ * afirmou, e inventar um `DONE` que ela não marcou seria mentir no histórico
+ * e nos minutos estudados. A presunção é uma leitura do plano, e ela se
+ * mantém entre recálculos porque as cópias carregam o status que tinham.
+ */
+function contarPassadasPresumidas(
+  copiadas: readonly AtividadeParaGravar[],
+): Readonly<Record<string, number>> {
+  const contagem: Record<string, number> = {};
+
+  for (const atividade of copiadas) {
+    if (atividade.status === 'SKIPPED') {
+      continue;
+    }
+    contagem[atividade.contentId] = (contagem[atividade.contentId] ?? 0) + 1;
+  }
+
+  return contagem;
 }
 
 /** Capacidade de cada dia da janela, já descontado o que as cópias ocupam. */
@@ -262,6 +282,7 @@ function juntar(
     scheduledDate: toDateColumn(atividade.date),
     estimatedMinutes: atividade.estimatedMinutes,
     position: atividade.position + (ocupacaoPorDia.get(atividade.date) ?? 0),
+    passIndex: atividade.passIndex,
   }));
 
   return [...copiadas, ...novas];

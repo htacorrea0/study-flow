@@ -15,6 +15,17 @@ import { z } from 'zod';
 // Não sobrescreve variáveis já definidas no ambiente (CI, Docker, testes).
 loadDotenv({ path: path.resolve(__dirname, '..', '..', '.env') });
 
+/**
+ * Chave que pode não existir — e, no `.env.example`, existe vazia.
+ * `FOO=` vira string vazia em `process.env`, não ausência: sem tratar isso,
+ * copiar o exemplo e não preencher derrubaria a API na subida.
+ */
+const chaveOpcional = z
+  .string()
+  .trim()
+  .optional()
+  .transform((valor) => (valor === undefined || valor === '' ? undefined : valor));
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -90,6 +101,14 @@ const envSchema = z.object({
    * O app espera até 240 s, então mantenha abaixo de ~180.
    */
   GEMINI_TOTAL_TIMEOUT_SECONDS: z.coerce.number().int().min(20).max(600).default(150),
+
+  /**
+   * Chave da busca de material de estudo. É OPCIONAL de propósito: sem ela o
+   * app inteiro continua funcionando, só a tela de sugestão diz que a busca
+   * não está configurada. Quem clona o repositório não precisa criar conta no
+   * Google para rodar os testes nem a demonstração.
+   */
+  YOUTUBE_API_KEY: chaveOpcional,
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -123,6 +142,12 @@ export const env = {
   geminiFallbackModels: raw.GEMINI_FALLBACK_MODELS.split(',')
     .map((model) => model.trim())
     .filter((model) => model.length > 0),
+  /**
+   * Dá para sugerir material: a busca está configurada. Em teste é sempre
+   * `false` — a suíte não sai para a internet nem quando a máquina de quem
+   * roda tem a chave no ambiente.
+   */
+  temBuscaDeMaterial: raw.NODE_ENV !== 'test' && raw.YOUTUBE_API_KEY !== undefined,
 } as const;
 
 export type Env = typeof env;

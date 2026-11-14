@@ -1,6 +1,13 @@
+import type { PlanConflict } from '@study-flow/shared';
+
 import { clientOrTransaction, prisma } from '../config/prisma';
 import type { TransactionClient } from '../config/prisma';
-import type { StudyPlan } from '../generated/prisma/client';
+import { Prisma, type StudyPlan } from '../generated/prisma/client';
+
+/** O Prisma tipa coluna `Json` por estrutura; `PlanConflict` não casa com ela sozinho. */
+function paraColunaJson(conflicts: readonly PlanConflict[]): Prisma.InputJsonValue {
+  return conflicts as unknown as Prisma.InputJsonValue;
+}
 
 /**
  * Plano ativo da pessoa.
@@ -25,11 +32,18 @@ export async function findActiveByUser(userId: string): Promise<StudyPlan | null
  */
 export async function create(
   userId: string,
-  data: { algorithmVersion: string; horizonStart: Date; horizonEnd: Date },
+  data: {
+    algorithmVersion: string;
+    horizonStart: Date;
+    horizonEnd: Date;
+    conflicts: readonly PlanConflict[];
+  },
   tx?: TransactionClient,
 ): Promise<StudyPlan> {
+  const { conflicts, ...resto } = data;
+
   return clientOrTransaction(tx).studyPlan.create({
-    data: { userId, status: 'ACTIVE', ...data },
+    data: { userId, status: 'ACTIVE', ...resto, conflicts: paraColunaJson(conflicts) },
   });
 }
 

@@ -5,3 +5,5 @@ export { registerStudyTimeSchema } from '@study-flow/shared';
 export type { RegisterStudyTimeInput } from '@study-flow/shared';
 export { monthlyStudyTimeQuerySchema } from '@study-flow/shared';
 export type { MonthlyStudyTimeQueryInput } from '@study-flow/shared';
+export { activityDetailParamsSchema } from '@study-flow/shared';
+export type { ActivityDetailParams } from '@study-flow/shared';

@@ -2,8 +2,10 @@
  * O título que a interface mostra para uma sessão de estudo.
  *
  * O título fica gravado em `StudyActivity.title` porque o plano é um
- * resultado congelado: refazer a frase a cada leitura exigiria saber de qual
- * passada a atividade veio, e isso o plano não guarda.
+ * resultado congelado: a frase foi decidida junto com a distribuição e é a
+ * que a pessoa viu no calendário naquele dia. A atividade também guarda o
+ * `passIndex`, mas refazer a frase a cada leitura mudaria o título de uma
+ * sessão já vivida sempre que a regra do verbo mudasse.
  *
  * O nome do conteúdo, porém, muda quando a pessoa renomeia o assunto, e aí a
  * frase gravada fica velha. Por isso a leitura recompõe o título com o nome

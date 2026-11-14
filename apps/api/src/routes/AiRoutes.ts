@@ -1,7 +1,8 @@
 import { Router } from 'express';
 
-import { aiStudyPlanSchema } from '@study-flow/shared';
+import { aiStudyPlanSchema, applyAiStudyPlanSchema } from '@study-flow/shared';
 
+import { ApplyStudyPlanController } from '../controllers/ai/ApplyStudyPlanController';
 import { DeleteSavedStudyPlanController } from '../controllers/ai/DeleteSavedStudyPlanController';
 import { GetSavedStudyPlanController } from '../controllers/ai/GetSavedStudyPlanController';
 import { SaveStudyPlanController } from '../controllers/ai/SaveStudyPlanController';
@@ -47,3 +48,14 @@ aiRoutes.put(
 );
 
 aiRoutes.delete('/study-plan', authenticate, DeleteSavedStudyPlanController);
+
+/**
+ * Aplica o plano: cria matérias, avaliações e conteúdos e refaz o
+ * calendário. Também não chama o Gemini.
+ */
+aiRoutes.post(
+  '/study-plan/apply',
+  authenticate,
+  validateRequest({ body: applyAiStudyPlanSchema }),
+  ApplyStudyPlanController,
+);
